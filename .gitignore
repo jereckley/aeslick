@@ -1,0 +1,10 @@
+node_modules
+coverage
+.DS_Store
+.eslintcache
+.env
+.idea
+dist
+
+.envrc
+
