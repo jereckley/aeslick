@@ -1,4 +1,4 @@
-#!/usr/bin/env node
+#!/usr/bin/env node --no-warnings
 import * as fse from 'fs-extra';
 import chalk from 'chalk';
 import { namespaces } from './namespace';
@@ -7,6 +7,7 @@ import { namespace as namespaceEnum } from './namespace/namespaces.enum';
 import { Command } from './command/command.enum';
 import { CommandInCommands } from './command/types';
 import { getCommandAndNamespace } from './getCommandAndNamespace';
+import inquirer = require('inquirer');
 
 const root = process.env.TARGET_PATH || process.cwd();
 
@@ -42,7 +43,14 @@ async function run() {
       ),
     );
   } else if (!!commands[namespace.id][command].questions) {
-    await commands[namespace.id][command].creator();
+    const cm = commands[ns][command];
+    try {
+      const answers = await inquirer.prompt(cm.questions);
+
+      await commands[ns][command].creator(answers);
+    } catch (error) {
+      console.error(chalk.red(`Error: ${JSON.stringify(error)}`));
+    }
   } else {
     console.log(chalk.yellow('Solid miss'));
   }

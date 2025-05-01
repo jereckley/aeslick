@@ -14,7 +14,6 @@ export const getCommandAndNamespace = (
     (key) => key === command,
   );
 
-
   if (!found) {
     return [namespaceDetails, undefined];
   }

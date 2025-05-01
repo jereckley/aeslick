@@ -7,4 +7,9 @@ export const namespaces: Namespaces = {
     id: namespace.CHAT,
     description: 'Conversation in the console.',
   },
+  [namespace.CODE]: {
+    name: 'Code',
+    id: namespace.CODE,
+    description: 'Code generation.',
+  }
 };
