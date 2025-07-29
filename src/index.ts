@@ -1,4 +1,4 @@
-#!/usr/bin/env node --no-warnings
+#!/usr/bin/env node
 import * as fse from 'fs-extra';
 import chalk from 'chalk';
 import { namespaces } from './namespace';

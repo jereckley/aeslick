@@ -1,15 +1,22 @@
 {
-  "name": "aeslick",
-  "version": "1.0.0",
+  "name": "@jereckley/aeslick",
+  "version": "0.0.10",
   "description": "CLI to generate code.",
-  "main": "src/index.ts",
+  "files": [
+    "dist/**/*"
+  ],
   "scripts": {
     "build": "cross-env NODE_ENV=production tsc",
-    "test": "jest"
+    "test": "jest",
+    "pub": "npm run build && npm publish --access=public"
+  },
+  "bin": {
+    "aeslick": "./dist/index.js"
   },
   "dependencies": {
     "chalk": "^2.3.2",
     "fs-extra": "^5.0.0",
+    "glob": "^11.0.2",
     "inquirer": "^8.0.0",
     "openai": "^4.96.2",
     "source-map-support": "^0.5.4"
@@ -32,9 +39,6 @@
     "ts-jest": "^29.2.5",
     "typescript": "^5.8.3"
   },
-  "files": [
-    "dist/**/*"
-  ],
-  "author": "",
+  "author": "jereckley",
   "license": "ISC"
 }

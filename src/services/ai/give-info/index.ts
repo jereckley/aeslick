@@ -3,7 +3,7 @@ import type OpenAI from 'openai';
 
 export const giveInfo = (client: OpenAI) => async (text: string, responseId?: string) => {
   const res = await client.responses.create({
-    model: 'gpt-4.1-nano',
+    model: 'o3-pro-2025-06-10',
     input: text,
     previous_response_id: responseId,
   });

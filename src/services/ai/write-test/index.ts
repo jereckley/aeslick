@@ -39,13 +39,12 @@ ${exampleTests ? exampleTests : 'none'}
 ${filePath}
 
 `;
-    await fse.writeFile(path.join(root, './context.txt'), prompt);
     let followUpPrompt =
       'Now write tests for this file using the same instructions an the original prompt: ' +
       filePath;
 
     const res = await client.responses.create({
-      model: 'o4-mini',
+      model: 'o3-pro-2025-06-10',
       input: responseId ? followUpPrompt : prompt,
       reasoning: { effort: 'high' },
       previous_response_id: responseId,

@@ -32,3 +32,11 @@ export const WRITE_TEST: Questions = [
     message: 'Global example tests (separated by a comma):',
   },
 ];
+
+export const CREATE_COMPONENT: Questions = [
+  {
+    type: 'input',
+    name: 'componentDescription',
+    message: 'Describe the needed component: ',
+  },
+];
