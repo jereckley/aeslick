@@ -1,6 +1,6 @@
 {
   "name": "@jereckley/aeslick",
-  "version": "0.0.10",
+  "version": "0.0.11",
   "description": "CLI to generate code.",
   "files": [
     "dist/**/*"
@@ -18,7 +18,7 @@
     "fs-extra": "^5.0.0",
     "glob": "^11.0.2",
     "inquirer": "^8.0.0",
-    "openai": "^4.96.2",
+    "openai": "^5.20.0",
     "source-map-support": "^0.5.4"
   },
   "devDependencies": {

@@ -1,9 +1,10 @@
 import { namespace } from '../namespace/namespaces.enum';
 import { Command } from './command.enum';
-import { CHAT_QUESTIONS, WRITE_TEST } from '../questions';
+import { CHAT_QUESTIONS, CREATE_COMPONENT, WRITE_TEST } from '../questions';
 import { chat } from '../actions';
 import { Commands } from './types';
 import { tests } from '../actions/tests';
+import { createComponent } from '../actions/create-component';
 
 export const commands: Commands = {
   [namespace.CHAT]: {
@@ -20,4 +21,11 @@ export const commands: Commands = {
       creator: tests,
     },
   },
+  [namespace.COMPONENT]: {
+    [Command.MAKE_COMPONENT]: {
+      id: Command.MAKE_COMPONENT,
+      questions: CREATE_COMPONENT,
+      creator: createComponent
+    },
+  }
 };

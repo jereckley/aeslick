@@ -11,5 +11,10 @@ export const namespaces: Namespaces = {
     name: 'Code',
     id: namespace.CODE,
     description: 'Code generation.',
-  }
+  },
+  [namespace.COMPONENT]: {
+    name: 'Component',
+    id: namespace.COMPONENT,
+    description: 'UI components.',
+  },
 };
