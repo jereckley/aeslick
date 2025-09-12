@@ -6,3 +6,7 @@ export type WriteFilesInput = {
 export type GetConfigByNameInput = {
   name: string;
 }
+
+export type PromptForInputInput = {
+  prompt: string;
+}

@@ -9,13 +9,13 @@ export const configService = async () => {
       model: 'gpt-5-mini-2025-08-07',
     };
   }
-  if (!projectConfig) {
+  if (projectConfig.length === 0) {
     const filesService = await fileService();
     const allconfigsUnparsed = await filesService.readFiles('./*.aeslick.json');
 
     for (const unparsedConfig of allconfigsUnparsed) {
       if (unparsedConfig) {
-        const name = unparsedConfig.path.split('/')?.[0];
+        const name = unparsedConfig.path.split('.')?.[0];
         const config = JSON.parse(unparsedConfig.content) as
           | ProjectConfig
           | BaseConfig;
@@ -45,7 +45,9 @@ export const configService = async () => {
       return projectConfig.map((p) => p.configName);
     },
     getProjectConfig: (name: string) => {
-      const project = projectConfig.find((p) => p.configName === name);
+      const project = projectConfig.find(
+        (p) => p.configName.toLowerCase() === name.toLowerCase(),
+      );
       if (!project) {
         throw new Error(`Project configuration for ${name} not found`);
       }

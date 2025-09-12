@@ -1,7 +1,6 @@
 import { Questions } from 'inquirer';
 import { Command } from './command.enum';
 import { namespace } from '../namespace/namespaces.enum';
-import { Record } from 'openai/core';
 
 export type CommandsCollection = Command;
 
