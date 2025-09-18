@@ -9,6 +9,9 @@ export const engine = async () => {
     functionDefinitionsMap['get-config-by-name'],
     functionDefinitionsMap['prompt-for-input'],
     functionDefinitionsMap['write-file'],
+    functionDefinitionsMap['get-list-of-files-in-path'],
+    functionDefinitionsMap['get-file-by-path'],
+    { type: 'image_generation' },
   ];
   const aiService = await getAiService(tools);
   const projectConfigsAvailable = (

@@ -9,6 +9,7 @@ import {
 import { functionMap } from '../../../tools';
 import { configService } from '../../config';
 import { promptForInput } from '../../../tools/prompt-for-input';
+import terminalImage from 'terminal-image';
 
 export const processResponse =
   (client: OpenAI, tools: Tool[]) => async (res: Response) => {
@@ -32,6 +33,12 @@ export const processResponse =
             console.log(chalk.white(content.text));
           }
         });
+      } else if (item.type === 'image_generation_call') {
+        const imgArray = item.result;
+        if (imgArray && imgArray.length > 0) {
+          const img = imgArray[0];
+          console.log(terminalImage.buffer(Buffer.from(img, 'base64')));
+        }
       } else {
         console.log(chalk.bgYellowBright(JSON.stringify(item)));
       }

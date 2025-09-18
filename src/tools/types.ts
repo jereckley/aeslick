@@ -7,6 +7,14 @@ export type GetConfigByNameInput = {
   name: string;
 }
 
+export type GetFileByPathInput = {
+  path: string;
+}
+
+export type GetListOfFilesInPathInput = {
+  path: string;
+}
+
 export type PromptForInputInput = {
   prompt: string;
 }

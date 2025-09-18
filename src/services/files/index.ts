@@ -1,16 +1,25 @@
 import * as fse from 'fs-extra';
 import * as path from 'path';
 import { readFiles } from './read-files';
+import { getListOfFilesInPath } from './get-list-of-files-in-path';
+import chalk from 'chalk';
 
 const root = process.cwd();
 export const fileService = async () => {
   return {
     writeFile: async (pathWithFileName: string, content: string) => {
+      const dirPath = path.dirname(pathWithFileName);
+      try {
+        await fse.ensureDir(path.join(root, dirPath));
+      } catch (err) {
+        console.error(chalk.red('Error creating directory:', err));
+      }
       await fse.writeFile(path.join(root, pathWithFileName), content);
     },
     readFile: async (pathWithFileName: string): Promise<string> => {
       return fse.readFileSync(pathWithFileName, 'utf-8');
     },
     readFiles: readFiles(),
+    getListOfFilesInPath: getListOfFilesInPath(),
   };
 };

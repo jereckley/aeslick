@@ -19,7 +19,8 @@
     "glob": "^11.0.2",
     "inquirer": "^8.0.0",
     "openai": "^5.20.0",
-    "source-map-support": "^0.5.4"
+    "source-map-support": "^0.5.4",
+    "terminal-image": "^4.0.0"
   },
   "devDependencies": {
     "@types/fs-extra": "^5.0.1",

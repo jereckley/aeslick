@@ -8,7 +8,13 @@ export type ProjectConfigs = {
   configName: string;
   config: ProjectConfig;
 }[]
+export type ProjectDetails = {
+  framework: string;
+  developerConcerns: string[];
+}
 export type ProjectConfig = {
   frontEndPath: string;
+  frontEndDetails: ProjectDetails;
   backEndPath: string;
+  backEndDetails: ProjectDetails;
 }
