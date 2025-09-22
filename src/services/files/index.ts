@@ -3,6 +3,7 @@ import * as path from 'path';
 import { readFiles } from './read-files';
 import { getListOfFilesInPath } from './get-list-of-files-in-path';
 import chalk from 'chalk';
+import { writeBase64Image } from './write-base64-image';
 
 const root = process.cwd();
 export const fileService = async () => {
@@ -21,5 +22,6 @@ export const fileService = async () => {
     },
     readFiles: readFiles(),
     getListOfFilesInPath: getListOfFilesInPath(),
+    writeBase64Image: writeBase64Image(),
   };
 };

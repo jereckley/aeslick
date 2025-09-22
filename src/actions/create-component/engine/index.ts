@@ -3,8 +3,9 @@ import { getAiService } from '../../../services/ai';
 import { functionDefinitionsMap } from '../../../tools';
 import { contextInput } from '../context-input';
 import { configService } from '../../../services/config';
+import { CreateComponentAnswers } from '..';
 
-export const engine = async () => {
+export const engine = async (answers: CreateComponentAnswers) => {
   const tools: Tool[] = [
     functionDefinitionsMap['get-config-by-name'],
     functionDefinitionsMap['prompt-for-input'],
@@ -20,6 +21,7 @@ export const engine = async () => {
   console.log('Project configs available:', projectConfigsAvailable);
   let prompts = contextInput.join('\n');
   prompts += `\n\nThe following project configurations are available: ${projectConfigsAvailable.join(', ')}. You can use the get-config-by-name tool to get the configuration of a specific project.`;
+  prompts += `\n\nComponent Description: ${answers.componentDescription}`;
 
   let res = await aiService.startAgent(prompts);
 
