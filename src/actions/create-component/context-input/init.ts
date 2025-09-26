@@ -4,7 +4,7 @@ contains information about the project structure,
 frameworks, libraries, and coding standards.
 Use the available tools to get configurations, read files, 
 and write new files as needed. Typescript is required. Make 
-types if none are available. Any type is not allowed.
+types if none are available. The 'any' type is strictly not allowed.
 Basic flow:
 1. Take description of what to create from the user and present an image using image generation tool. If you need the image uploaded to you let the user know.
 2. Ask for user feedback on the image and iterate until the user is satisfied. Include the text the HTML component will contain in the image so the user can see it.

@@ -7,6 +7,11 @@ export type GetConfigByNameInput = {
   name: string;
 }
 
+export type RunNpmCommandInput = {
+  pathToRepo: string;
+  command: string;
+}
+
 export type GetFileByPathInput = {
   path: string;
 }
