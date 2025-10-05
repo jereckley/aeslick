@@ -5,6 +5,7 @@ import {
   getListOfFilesInPathTool,
 } from './get-list-of-files-in-path';
 import { promptForInput, promptForInputTool } from './prompt-for-input';
+import { runNpmCommand, runNpmCommandTool } from './run-npm-command';
 import { writeFile, writeFileTool } from './write-files';
 
 export const functionMap = {
@@ -13,6 +14,7 @@ export const functionMap = {
   'prompt-for-input': promptForInput,
   'get-list-of-files-in-path': getListOfFilesInPath,
   'get-file-by-path': getFileByPath,
+  'run-npm-command': runNpmCommand,
 };
 
 export const functionDefinitionsMap = {
@@ -21,4 +23,5 @@ export const functionDefinitionsMap = {
   'prompt-for-input': promptForInputTool,
   'get-list-of-files-in-path': getListOfFilesInPathTool,
   'get-file-by-path': getFileByPathTool,
+  'run-npm-command': runNpmCommandTool,
 };

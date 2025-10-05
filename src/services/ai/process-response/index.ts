@@ -4,6 +4,7 @@ import {
   EasyInputMessage,
   Response,
   ResponseInputItem,
+  type ResponseOutputItem,
   Tool,
 } from 'openai/resources/responses/responses';
 import { functionMap } from '../../../tools';
@@ -14,9 +15,12 @@ import { fileService } from '../../files';
 export const processResponse =
   (client: OpenAI, tools: Tool[]) => async (res: Response) => {
     const items = res.output || [];
+    console.log(chalk.greenBright(res.id));
     const newList: ResponseInputItem[] = [];
     const fService = await fileService();
-    for (const item of items) {
+    const sorted =  sortItems(items)
+    console.log(sorted.length);
+    for (const item of sorted) {
       if (item.type == 'function_call') {
         console.log(chalk.blueBright(JSON.stringify(item)));
         const funcRes = await functionMap[
@@ -37,6 +41,7 @@ export const processResponse =
         });
       } else if (item.type === 'image_generation_call') {
         const img = item.result;
+        console.log(chalk.blueBright(img?.length?.toString() || 'no image'));
         if (img) {
           const fileName =
             new Date()
@@ -56,9 +61,7 @@ export const processResponse =
       }
     }
     if (newList.length === 0) {
-      const message = await promptForInput(
-        JSON.stringify({ prompt: '>' }),
-      );
+      const message = await promptForInput(JSON.stringify({ prompt: '>' }));
       newList.push({
         type: 'message',
         content: message.response,
@@ -68,8 +71,29 @@ export const processResponse =
     const baseConfig = (await configService()).baseConfig();
     return await client.responses.create({
       model: baseConfig.model,
+      reasoning: { effort: 'medium' },
       tools,
       previous_response_id: res.id,
       input: newList,
     });
   };
+
+const sortItems = (items: ResponseOutputItem[]) => {
+  const functionCalls = items.filter((i) => i.type === 'function_call');
+  const messages = items.filter((i) => i.type === 'message');
+  const imageGenerations = items.filter(
+    (i) => i.type === 'image_generation_call',
+  );
+  const remaining = items.filter(
+    (i) =>
+      i.type !== 'function_call' &&
+      i.type !== 'message' &&
+      i.type !== 'image_generation_call',
+  );
+  return [
+    ...imageGenerations,
+    ...remaining,
+    ...messages,
+    ...functionCalls,
+  ];
+};
