@@ -16,6 +16,10 @@ export type GetFileByPathInput = {
   path: string;
 }
 
+export type GetImageByPathInput = {
+  path: string;
+}
+
 export type GetListOfFilesInPathInput = {
   path: string;
 }

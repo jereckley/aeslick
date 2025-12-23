@@ -4,21 +4,28 @@ import { GetFileByPathInput } from './types';
 
 export const getFileByPath = async (input: string) => {
   const data = JSON.parse(input) as GetFileByPathInput;
-  return await (await fileService()).readFile(data.path);
+  let file: string;
+  try {
+    file = await (await fileService()).readFile(data.path);
+  } catch (error) {
+    console.error('Error reading file:', error);
+    file = 'No file found';
+  }
+  return file;
 };
 
 export const getFileByPathTool: FunctionTool = {
   type: 'function',
   strict: true,
   name: 'get-file-by-path',
-  description: 'Get the content of a file by its path.',
+  description: 'Get the string content of a file by its path.',
   parameters: {
     type: 'object',
     properties: {
       path: {
         type: 'string',
         description:
-          'The path of the file to retrieve, relative to the current working directory.',
+          'The path of the file to retrieve, relative to the current working directory. Include the repo folder from config in path.',
       },
     },
     required: ['path'],

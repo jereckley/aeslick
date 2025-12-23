@@ -1,5 +1,6 @@
 import { getConfigByName, getConfigByNameTool } from './get-config-by-name';
 import { getFileByPath, getFileByPathTool } from './get-file-by-path';
+import { getImageByPath, getImageByPathTool } from './get-image-by-path';
 import {
   getListOfFilesInPath,
   getListOfFilesInPathTool,
@@ -14,6 +15,7 @@ export const functionMap = {
   'prompt-for-input': promptForInput,
   'get-list-of-files-in-path': getListOfFilesInPath,
   'get-file-by-path': getFileByPath,
+  'get-image-by-path': getImageByPath,
   'run-npm-command': runNpmCommand,
 };
 
@@ -23,5 +25,6 @@ export const functionDefinitionsMap = {
   'prompt-for-input': promptForInputTool,
   'get-list-of-files-in-path': getListOfFilesInPathTool,
   'get-file-by-path': getFileByPathTool,
+  'get-image-by-path': getImageByPathTool,
   'run-npm-command': runNpmCommandTool,
 };

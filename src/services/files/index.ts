@@ -20,6 +20,15 @@ export const fileService = async () => {
     readFile: async (pathWithFileName: string): Promise<string> => {
       return fse.readFileSync(pathWithFileName, 'utf-8');
     },
+    readBase64Image: async (pathWithFileName: string): Promise<string> => {
+      try {
+        const fileBuffer = await fse.readFile(path.join(root, pathWithFileName));
+        return fileBuffer.toString('base64');
+      } catch (err) {
+        console.error(chalk.red('Error reading image file:'), err);
+        return '';
+      }
+    },
     readFiles: readFiles(),
     getListOfFilesInPath: getListOfFilesInPath(),
     writeBase64Image: writeBase64Image(),

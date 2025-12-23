@@ -13,6 +13,7 @@ export const engine = async (answers: CreateComponentAnswers) => {
     functionDefinitionsMap['write-file'],
     functionDefinitionsMap['get-list-of-files-in-path'],
     functionDefinitionsMap['get-file-by-path'],
+    functionDefinitionsMap['get-image-by-path'],
     { type: 'image_generation' },
     functionDefinitionsMap['run-npm-command'],
   ];
@@ -23,7 +24,7 @@ export const engine = async (answers: CreateComponentAnswers) => {
   console.log('Project configs available:', projectConfigsAvailable);
   let prompts = contextInput.join('\n');
   prompts += `\n\nThe following project configurations are available: ${projectConfigsAvailable.join(', ')}. You can use the get-config-by-name tool to get the configuration of a specific project.`;
-  prompts += `\n\nComponent Description: ${answers.componentDescription}`;
+  prompts += `\n\nUser Prompt: "${answers.componentDescription}"`;
 
   let res: Response | undefined;
 
@@ -31,7 +32,7 @@ export const engine = async (answers: CreateComponentAnswers) => {
     const message = await promptForInput(
       JSON.stringify({
         prompt:
-          "You didn't enter a descripition. Please enter ID where you want to pickup. >",
+          "You didn't enter a prompt. Please enter ID where you want to pickup. >",
       }),
     );
     if (!message) {

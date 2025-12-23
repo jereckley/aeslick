@@ -1,5 +1,9 @@
 import { fileService } from '../files';
-import { BaseConfig, ProjectConfig, ProjectConfigs } from './types';
+import {
+  BaseConfig,
+  ProjectConfigs,
+  ProjectDetails,
+} from './types';
 
 let baseConfig: BaseConfig | undefined;
 let projectConfig: ProjectConfigs = [];
@@ -17,7 +21,7 @@ export const configService = async () => {
       if (unparsedConfig) {
         const name = unparsedConfig.path.split('.')?.[0];
         const config = JSON.parse(unparsedConfig.content) as
-          | ProjectConfig
+          | ProjectDetails[]
           | BaseConfig;
         if (name) {
           if (name === 'base') {
@@ -25,10 +29,12 @@ export const configService = async () => {
               ...(config as BaseConfig),
             };
           } else {
-            projectConfig.push({
-              configName: name,
-              config: config as ProjectConfig,
-            });
+            for (const project of config as ProjectDetails[]) {
+              projectConfig.push({
+                configName: project.name,
+                config: project,
+              } as ProjectConfigs[0]);
+            }
           }
         }
       }
@@ -53,7 +59,7 @@ export const configService = async () => {
       }
       return {
         ...project.config,
-      } as ProjectConfig;
+      } as ProjectDetails;
     },
   };
 };
