@@ -1,13 +1,13 @@
-import { glob } from 'glob';
+import { globSync } from 'glob';
+import * as path from 'path';
 
 export const getListOfFilesInPath =
   () =>
   async (pattern: string): Promise<{ fileContents: string }> => {
-    const filePaths = glob.sync(pattern) as string[];
+    const searchPattern = pattern.includes('*')
+      ? pattern
+      : path.join(pattern, '**/*'); // list all files under the provided directory
+    const filePaths = globSync(searchPattern, { nodir: true }) as string[];
 
-    let list = '';
-    filePaths.forEach((filePath) => {
-      list += filePath + '\n';
-    });
-    return { fileContents: list };
+    return { fileContents: filePaths.join('\n') };
   };

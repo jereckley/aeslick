@@ -1,36 +1,29 @@
 import { FunctionTool } from 'openai/resources/responses/responses';
 import { RunNpmCommandInput } from './types';
 import { exec } from 'child_process';
+import { promisify } from 'util';
+
+const execAsync = promisify(exec);
 
 export const runNpmCommand = async (input: string) => {
   const data = JSON.parse(input) as RunNpmCommandInput;
-  let errorMessage = '';
-  let successMessage = '';
-  exec(`cd ${data.pathToRepo}`, (error, stdout, stderr) => {
-    if (error) {
-      console.error(`exec error: ${error}`);
-      return;
-    }
-    console.log(`stdout: ${stdout}`);
-    console.error(`stderr: ${stderr}`);
-  });
-  exec(`npm run ${data.command}`, (error, stdout, stderr) => {
-    if (error) {
-      errorMessage = `exec error: ${error}`;
-      return;
-    }
-    successMessage = `stdout: ${stdout}`;
-    errorMessage = `stderr: ${stderr}`;
-  });
-  exec(`cd ..`, (error, stdout, stderr) => {
-    if (error) {
-      console.error(`exec error: ${error}`);
-      return;
-    }
-    console.log(`stdout: ${stdout}`);
-    console.error(`stderr: ${stderr}`);
-  });
-  return { successMessage, errorMessage };
+
+  try {
+    const { stdout, stderr } = await execAsync(`npm run ${data.command}`, {
+      cwd: data.pathToRepo,
+    });
+
+    return {
+      successMessage: stdout?.trim() ?? '',
+      errorMessage: stderr?.trim() ?? '',
+    };
+  } catch (error: any) {
+    // Bubble up stderr/stdout from the failed command so callers can show real errors.
+    return {
+      successMessage: error?.stdout?.toString().trim() ?? '',
+      errorMessage: error?.stderr?.toString().trim() || error?.message || 'Unknown error',
+    };
+  }
 };
 
 export const runNpmCommandTool: FunctionTool = {

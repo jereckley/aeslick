@@ -37,6 +37,6 @@ export const CREATE_COMPONENT: Questions = [
   {
     type: 'input',
     name: 'componentDescription',
-    message: 'Describe the needed component: ',
+    message: 'Let\'s get started: ',
   },
 ];
