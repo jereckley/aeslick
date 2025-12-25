@@ -22,6 +22,7 @@ export const processResponse =
       console.log(chalk.greenBright(`Conversation continues (response id: ${res.id})`));
       const newList: ResponseInputItem[] = [];
       const fService = await fileService();
+      const unrecognizedItems: ResponseOutputItem[] = [];
       const sorted = sortItems(items);
       console.log(chalk.blue(`Processing ${sorted.length} response item(s)...`));
       for (const item of sorted) {
@@ -80,8 +81,28 @@ export const processResponse =
           delete item.result;
           console.log(chalk.cyan('Image generation metadata processed.'));
         } else {
-          console.log(chalk.yellow('Received unrecognized response item; skipping.'));
+          unrecognizedItems.push(item);
+          console.log(
+            chalk.yellow(
+              'Received unrecognized response item; requesting handling guidance from OpenAI.',
+            ),
+          );
         }
+      }
+      if (unrecognizedItems.length > 0) {
+        const unrecognizedDetails = unrecognizedItems
+          .map((item) => describeResponseItem(item))
+          .join('\n');
+        newList.push({
+          type: 'message',
+          role: 'developer',
+          content: [
+            `Encountered ${unrecognizedItems.length} unrecognized response item(s) in the last reply.`,
+            'Provide guidance on how the CLI should handle these item types and include a concise user-facing prompt we can show to collect confirmation for the desired behavior.',
+            'Unrecognized items:',
+            unrecognizedDetails,
+          ].join('\n'),
+        } satisfies EasyInputMessage);
       }
       if (newList.length === 0) {
         console.log(chalk.yellow('No assistant output received; asking for more input...'));
@@ -167,6 +188,18 @@ const sortItems = (items: ResponseOutputItem[]) => {
     ...messages,
     ...functionCalls,
   ];
+};
+
+const describeResponseItem = (item: ResponseOutputItem) => {
+  const sanitized = { ...item };
+  if ('result' in sanitized) {
+    delete (sanitized as any).result;
+  }
+  try {
+    return JSON.stringify(sanitized);
+  } catch {
+    return `Unserializable response item of type "${item.type}"`;
+  }
 };
 
 const formatErrorMessage = (error: unknown) => {
