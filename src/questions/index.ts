@@ -40,3 +40,36 @@ export const CREATE_COMPONENT: Questions = [
     message: 'Let\'s get started: ',
   },
 ];
+
+export const CREATE_PROJECT_CONFIG: Questions = [
+  {
+    type: 'input',
+    name: 'configFileName',
+    message: 'Project config file name (without extension):',
+  },
+  {
+    type: 'input',
+    name: 'projectName',
+    message: 'Project name:',
+  },
+  {
+    type: 'input',
+    name: 'projectPath',
+    message: 'Path to the project root:',
+  },
+  {
+    type: 'input',
+    name: 'framework',
+    message: 'Framework:',
+  },
+  {
+    type: 'input',
+    name: 'generatedCodegenTypesPath',
+    message: 'Path to generated codegen types:',
+  },
+  {
+    type: 'input',
+    name: 'developerConcerns',
+    message: 'Developer concerns (comma separated):',
+  },
+];

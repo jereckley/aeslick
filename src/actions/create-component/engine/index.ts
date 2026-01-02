@@ -1,7 +1,7 @@
 import { Tool, Response } from 'openai/resources/responses/responses';
 import { getAiService } from '../../../services/ai';
 import { functionDefinitionsMap } from '../../../tools';
-import { contextInput } from '../context-input';
+import { buildContextInput } from '../context-input';
 import { configService } from '../../../services/config';
 import { CreateComponentAnswers } from '..';
 import { promptForInput } from '../../../tools/prompt-for-input';
@@ -18,11 +18,15 @@ export const engine = async (answers: CreateComponentAnswers) => {
     functionDefinitionsMap['run-npm-command'],
   ];
   const aiService = await getAiService(tools);
-  const projectConfigsAvailable = (
-    await configService()
-  ).projectConfigsAvailable();
+  const configSvc = await configService();
+  const projectConfigsAvailable = configSvc.projectConfigsAvailable();
   console.log('Project configs available:', projectConfigsAvailable);
-  let prompts = contextInput.join('\n');
+  const contextConfig =
+    projectConfigsAvailable.length > 0
+      ? configSvc.getProjectContextConfig(projectConfigsAvailable[0])
+      : undefined;
+
+  let prompts = buildContextInput(contextConfig).join('\n');
   prompts += `\n\nThe following project configurations are available: ${projectConfigsAvailable.join(', ')}. You can use the get-config-by-name tool to get the configuration of a specific project.`;
   prompts += `\n\nUser Prompt: "${answers.componentDescription}"`;
 
