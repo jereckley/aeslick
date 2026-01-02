@@ -13,8 +13,12 @@ export type ProjectDetails = {
   path: string;
   details: ProjectConfig;
 };
+export type AgentConfig = {
+  notes: string;
+};
 export type ProjectConfig = {
   framework: string;
   generatedCodegenTypesPath: string;
   developerConcerns: string[];
+  agent?: AgentConfig;
 };

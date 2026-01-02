@@ -1,13 +1,20 @@
-import { globSync } from 'glob';
 import * as path from 'path';
+import * as fse from 'fs-extra';
 
 export const getListOfFilesInPath =
   () =>
   async (pattern: string): Promise<{ fileContents: string }> => {
-    const searchPattern = pattern.includes('*')
-      ? pattern
-      : path.join(pattern, '**/*'); // list all files under the provided directory
-    const filePaths = globSync(searchPattern, { nodir: true }) as string[];
+    const root = path.resolve(process.cwd(), pattern);
+    const entries = await fse.readdir(root);
+    const relativeNames = await Promise.all(
+      entries
+        .filter((entry) => entry !== 'node_modules')
+        .map(async (entry) => {
+          const fullPath = path.join(root, entry);
+          const stats = await fse.stat(fullPath);
+          return stats.isDirectory() ? `${entry}/` : entry;
+        }),
+    );
 
-    return { fileContents: filePaths.join('\n') };
+    return { fileContents: relativeNames.join('\n') };
   };

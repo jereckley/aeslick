@@ -5,6 +5,7 @@ import {
   Response,
   ResponseInputItem,
   type ResponseOutputItem,
+  ResponseReasoningItem,
   Tool,
 } from 'openai/resources/responses/responses';
 import { functionMap } from '../../../tools';
@@ -15,16 +16,22 @@ import { setTimeout as delay } from 'timers/promises';
 import * as fse from 'fs-extra';
 import * as path from 'path';
 
+const MAX_FUNCTION_OUTPUT_LENGTH = 12000;
+
 export const processResponse =
   (client: OpenAI, tools: Tool[]) => async (res: Response) => {
     try {
       const items = res.output || [];
-      console.log(chalk.greenBright(`Conversation continues (response id: ${res.id})`));
+      console.log(
+        chalk.greenBright(`Conversation continues (response id: ${res.id})`),
+      );
       const newList: ResponseInputItem[] = [];
       const fService = await fileService();
       const unrecognizedItems: ResponseOutputItem[] = [];
       const sorted = sortItems(items);
-      console.log(chalk.blue(`Processing ${sorted.length} response item(s)...`));
+      console.log(
+        chalk.blue(`Processing ${sorted.length} response item(s)...`),
+      );
       for (const item of sorted) {
         if (item.type == 'function_call') {
           const argsLabel =
@@ -41,15 +48,18 @@ export const processResponse =
               item.name as keyof typeof functionMap
             ](item.arguments);
             console.log(chalk.cyan(`Tool "${item.name}" completed.`));
+            const formattedOutput = serializeFunctionOutput(funcRes);
             newList.push({
               type: 'function_call_output',
               call_id: item.call_id,
-              output: JSON.stringify(funcRes),
+              output: formattedOutput,
             });
           } catch (error) {
             const errorMessage = formatErrorMessage(error);
             console.error(
-              chalk.red(`Tool "${item.name}" failed. Returning error to OpenAI: ${errorMessage}`),
+              chalk.red(
+                `Tool "${item.name}" failed. Returning error to OpenAI: ${errorMessage}`,
+              ),
             );
             newList.push({
               type: 'function_call_output',
@@ -63,6 +73,8 @@ export const processResponse =
               console.log(chalk.white(`Assistant: ${content.text}`));
             }
           });
+        } else if (item.type === 'reasoning') {
+          logReasoningItem(item);
         } else if (item.type === 'image_generation_call') {
           const img = item.result;
           if (img) {
@@ -90,22 +102,18 @@ export const processResponse =
         }
       }
       if (unrecognizedItems.length > 0) {
-        const unrecognizedDetails = unrecognizedItems
-          .map((item) => describeResponseItem(item))
-          .join('\n');
-        newList.push({
-          type: 'message',
-          role: 'developer',
-          content: [
-            `Encountered ${unrecognizedItems.length} unrecognized response item(s) in the last reply.`,
-            'Provide guidance on how the CLI should handle these item types and include a concise user-facing prompt we can show to collect confirmation for the desired behavior.',
-            'Unrecognized items:',
-            unrecognizedDetails,
-          ].join('\n'),
-        } satisfies EasyInputMessage);
+        const unrecognizedDetails = unrecognizedItems.forEach((item) => {
+          console.log(
+            chalk.yellow(`Unrecognized item: ${describeResponseItem(item)}`),
+          );
+        });
       }
       if (newList.length === 0) {
-        console.log(chalk.yellow('No assistant output received; asking for more input...'));
+        console.log(
+          chalk.yellow(
+            'No assistant output received; asking for more input...',
+          ),
+        );
         const message = await promptForInput(JSON.stringify({ prompt: '>' }));
         newList.push({
           type: 'message',
@@ -130,7 +138,10 @@ export const processResponse =
       );
       return nextResponse;
     } catch (error) {
-      console.error(chalk.red('Failed to process response from OpenAI:'), error);
+      console.error(
+        chalk.red('Failed to process response from OpenAI:'),
+        error,
+      );
       return await forwardErrorToOpenAi(client, tools, res, error);
     }
   };
@@ -182,12 +193,7 @@ const sortItems = (items: ResponseOutputItem[]) => {
       i.type !== 'message' &&
       i.type !== 'image_generation_call',
   );
-  return [
-    ...imageGenerations,
-    ...remaining,
-    ...messages,
-    ...functionCalls,
-  ];
+  return [...imageGenerations, ...remaining, ...messages, ...functionCalls];
 };
 
 const describeResponseItem = (item: ResponseOutputItem) => {
@@ -199,6 +205,87 @@ const describeResponseItem = (item: ResponseOutputItem) => {
     return JSON.stringify(sanitized);
   } catch {
     return `Unserializable response item of type "${item.type}"`;
+  }
+};
+
+const logReasoningItem = (item: ResponseReasoningItem) => {
+  const headerParts = [
+    item.id ? `id: ${item.id}` : null,
+    item.status ? `status: ${item.status}` : null,
+  ].filter(Boolean);
+  const headerSuffix =
+    headerParts.length > 0 ? ` (${headerParts.join(' | ')})` : '';
+  console.log(chalk.magenta(`--- Reasoning${headerSuffix} ---`));
+
+  const summaryText = (item.summary ?? [])
+    .map((summary) => summary.text)
+    .filter(Boolean)
+    .join(' ')
+    .trim();
+  if (summaryText) {
+    console.log(
+      chalk.magenta(`summary: ${truncateForLog(summaryText, 400)}`),
+    );
+  }
+
+  const reasoningSteps =
+    item.content?.map((content) => content.text).filter(Boolean) ?? [];
+  reasoningSteps.forEach((text, index) => {
+    console.log(
+      chalk.magenta(
+        `step ${index + 1}: ${truncateForLog(text, 800)}`,
+      ),
+    );
+  });
+
+  if (!summaryText && reasoningSteps.length === 0) {
+    console.log(chalk.magenta('no reasoning text provided.'));
+  }
+  console.log(chalk.magenta('--- end reasoning ---'));
+};
+
+const truncateForLog = (text: string, limit = 600) => {
+  if (text.length <= limit) {
+    return text;
+  }
+  const remaining = text.length - limit;
+  return `${text.slice(0, limit)}... [truncated ${remaining} characters]`;
+};
+
+const serializeFunctionOutput = (output: unknown) => {
+  const serialized = safeStringify(output);
+  if (serialized.length <= MAX_FUNCTION_OUTPUT_LENGTH) {
+    return serialized;
+  }
+
+  console.log(
+    chalk.yellow(
+      `Tool output length ${serialized.length} exceeded ${MAX_FUNCTION_OUTPUT_LENGTH} characters; truncating to avoid context window errors.`,
+    ),
+  );
+
+  const truncated = serialized.slice(0, MAX_FUNCTION_OUTPUT_LENGTH);
+  return safeStringify({
+    truncated: true,
+    original_length: serialized.length,
+    returned_length: truncated.length,
+    preview: truncated,
+    note:
+      'Output shortened to avoid exceeding the model context window. Ask for a smaller slice or more specific path if needed.',
+  });
+};
+
+const safeStringify = (value: unknown): string => {
+  try {
+    const serialized = JSON.stringify(value);
+    if (typeof serialized === 'string') {
+      return serialized;
+    }
+    return JSON.stringify(String(value));
+  } catch (error) {
+    return JSON.stringify({
+      note: `Unable to stringify tool output: ${formatErrorMessage(error)}`,
+    });
   }
 };
 
@@ -217,7 +304,11 @@ const formatErrorMessage = (error: unknown) => {
 };
 
 const isRateLimitError = (error: any) => {
-  const status = error?.status ?? error?.statusCode ?? error?.cause?.status ?? error?.response?.status;
+  const status =
+    error?.status ??
+    error?.statusCode ??
+    error?.cause?.status ??
+    error?.response?.status;
   return status === 429;
 };
 
@@ -241,7 +332,9 @@ const forwardErrorToOpenAi = async (
   const baseConfig = (await configService()).baseConfig();
   const errorMessage = formatErrorMessage(error);
   try {
-    console.log(chalk.yellow('Attempting to forward the error back to OpenAI...'));
+    console.log(
+      chalk.yellow('Attempting to forward the error back to OpenAI...'),
+    );
     const nextResponse = await createResponseWithRetry(client, {
       model: baseConfig.model,
       reasoning: { effort: 'medium' },
