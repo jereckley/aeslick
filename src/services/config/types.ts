@@ -26,7 +26,7 @@ export type RepoConfigWrapper = {
 
 export type ProjectWrapper = {
   projectName: string;
-  context: ContextWrapper;
+  context?: ContextWrapper;
   repos: Repo[];
 };
 export type Repo = {
