@@ -44,32 +44,32 @@ export const CREATE_COMPONENT: Questions = [
 export const CREATE_PROJECT_CONFIG: Questions = [
   {
     type: 'input',
-    name: 'configFileName',
-    message: 'Project config file name (without extension):',
+    name: 'Project Name',
+    message: 'Project Name:',
   },
   {
     type: 'input',
     name: 'projectName',
-    message: 'Project name:',
+    message: 'First repo name:',
   },
   {
     type: 'input',
     name: 'projectPath',
-    message: 'Path to the project root:',
+    message: 'First repo path:',
   },
   {
     type: 'input',
     name: 'framework',
-    message: 'Framework:',
+    message: 'First repo framework:',
   },
   {
     type: 'input',
     name: 'generatedCodegenTypesPath',
-    message: 'Path to generated codegen types:',
+    message: 'First repos path to generated codegen types if relevant:',
   },
   {
     type: 'input',
     name: 'developerConcerns',
-    message: 'Developer concerns (comma separated):',
+    message: 'First repos developer concerns (comma separated):',
   },
 ];

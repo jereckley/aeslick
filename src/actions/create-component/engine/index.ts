@@ -19,15 +19,21 @@ export const engine = async (answers: CreateComponentAnswers) => {
   ];
   const aiService = await getAiService(tools);
   const configSvc = await configService();
-  const projectConfigsAvailable = configSvc.projectConfigsAvailable();
-  console.log('Project configs available:', projectConfigsAvailable);
+  const repoConfigsAvailable = configSvc.projectRepoConfigsAvailable();
+  const projects = configSvc.getNamesOfProjectsAvailable();
+  console.log('Project configs available:', projects.join(', '));
   const contextConfig =
-    projectConfigsAvailable.length > 0
-      ? configSvc.getProjectContextConfig(projectConfigsAvailable[0])
+    projects.length === 1 
+      ? configSvc.getProjectContextConfig(projects[0])
       : undefined;
 
-  let prompts = buildContextInput(contextConfig).join('\n');
-  prompts += `\n\nThe following project configurations are available: ${projectConfigsAvailable.join(', ')}. You can use the get-config-by-name tool to get the configuration of a specific project.`;
+  if (!projects.length) {
+    throw new Error('No projects available in configuration.');
+  }
+
+  let prompts = contextConfig ? buildContextInput(contextConfig) : 'Prompt user for what project they are working on if they do ont specify it.';
+  prompts += `\n\nThe following projects are available: ${projects.join(', ')}.`;
+  prompts += `\n\nThe following repo configurations are available: ${repoConfigsAvailable.join(', ')}. You can use the get-config-by-name tool to get the configuration of a specific project.`;
   prompts += `\n\nUser Prompt: "${answers.componentDescription}"`;
 
   let res: Response | undefined;

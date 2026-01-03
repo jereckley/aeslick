@@ -2,19 +2,20 @@ import { fileService } from '../files';
 import {
   BaseConfig,
   ContextConfig,
-  ProjectConfigWrapper,
-  ProjectDetails,
+  RepoConfigWrapper,
+  ProjectWrapper,
 } from './types';
 
 let baseConfig: BaseConfig | undefined;
-let projectConfigWrappers: ProjectConfigWrapper[] = [];
+let repoConfigs: RepoConfigWrapper[] = [];
+let projects: ProjectWrapper[] = [];
 export const configService = async () => {
   if (!baseConfig) {
     baseConfig = {
       model: 'gpt-5-mini-2025-08-07',
     };
   }
-  if (projectConfigWrappers.length === 0) {
+  if (repoConfigs.length === 0) {
     const filesService = await fileService();
     const allconfigsUnparsed = await filesService.readFiles('./*.aeslick.json');
 
@@ -22,7 +23,7 @@ export const configService = async () => {
       if (unparsedConfig) {
         const name = unparsedConfig.path.split('.')?.[0];
         const config = JSON.parse(unparsedConfig.content) as
-          | ProjectDetails[]
+          | ProjectWrapper
           | BaseConfig;
         if (name) {
           if (name === 'base') {
@@ -30,93 +31,53 @@ export const configService = async () => {
               ...(config as BaseConfig),
             };
           } else {
-            const parsed = config as unknown;
-            const parsedArray = Array.isArray(parsed) ? parsed : undefined;
-            const parsedObject =
-              !!parsed && typeof parsed === 'object' && !Array.isArray(parsed)
-                ? (parsed as Record<string, unknown>)
-                : undefined;
+            const parsed = config as ProjectWrapper;
+            projects.push(parsed);
 
-            const arrayIsWrapper =
-              parsedArray &&
-              parsedArray.length > 0 &&
-              typeof parsedArray[0] === 'object' &&
-              !!parsedArray[0] &&
-              ('repos' in (parsedArray[0] as Record<string, unknown>) ||
-                'projects' in (parsedArray[0] as Record<string, unknown>));
-
-            if (arrayIsWrapper && parsedArray) {
-              for (const entry of parsedArray) {
-                const entryObj = entry as Record<string, unknown>;
-                const repos = Array.isArray(entryObj.repos)
-                  ? (entryObj.repos as ProjectDetails[])
-                  : Array.isArray(entryObj.projects)
-                    ? (entryObj.projects as ProjectDetails[])
-                    : [];
-                const context = entryObj.context as
-                  | { input?: ContextConfig }
-                  | undefined;
-
-                projectConfigWrappers.push({
-                  configName: name,
-                  context,
-                  repos,
+            if (parsed) {
+              for (const repo of parsed.repos) {
+                repoConfigs.push({
+                  projectName: parsed.projectName,
+                  repoName: repo.name,
+                  repo,
                 });
               }
-            } else {
-              const repos: ProjectDetails[] = parsedArray
-                ? (parsedArray as ProjectDetails[])
-                : Array.isArray(parsedObject?.repos)
-                  ? ((parsedObject?.repos as ProjectDetails[]) ?? [])
-                  : Array.isArray(parsedObject?.projects)
-                    ? ((parsedObject?.projects as ProjectDetails[]) ?? [])
-                    : [];
-
-              const context = parsedObject
-                ? (parsedObject.context as { input?: ContextConfig } | undefined)
-                : undefined;
-
-              projectConfigWrappers.push({
-                configName: name,
-                context,
-                repos,
-              });
             }
           }
         }
       }
     }
   }
-  if (projectConfigWrappers.length === 0) {
+  if (repoConfigs.length === 0) {
     throw new Error('No project configurations found');
   }
   return {
     baseConfig: () => {
       return baseConfig;
     },
-    projectConfigsAvailable: () => {
-      return projectConfigWrappers.map((p) => p.configName);
+    projectRepoConfigsAvailable: () => {
+      return repoConfigs.map((p) => p.repoName);
     },
-    getProjectConfig: (name: string) => {
-      const project = projectConfigWrappers.find(
-        (p) => p.configName.toLowerCase() === name.toLowerCase(),
+    getProjectRepoConfig: (name: string) => {
+      const project = repoConfigs.find(
+        (p) => p.repoName.toLowerCase() === name.toLowerCase(),
       );
       if (!project) {
         throw new Error(`Project configuration for ${name} not found`);
       }
-      return [...project.repos] as ProjectDetails[];
+      return project.repo;
+    },
+    getNamesOfProjectsAvailable: () => {
+      return projects.map((p) => p.projectName);
     },
     getProjectContextConfig: (name?: string): ContextConfig | undefined => {
       const nameToUse =
-        name ??
-        (projectConfigWrappers.length > 0
-          ? projectConfigWrappers[0].configName
-          : '');
+        name ?? (projects.length > 0 ? projects[0].projectName : '');
       if (!nameToUse) {
         return undefined;
       }
-      const project = projectConfigWrappers.find(
-        (p) => p.configName.toLowerCase() === nameToUse.toLowerCase(),
+      const project = projects.find(
+        (p) => p.projectName.toLowerCase() === nameToUse.toLowerCase(),
       );
 
       return project?.context?.input;

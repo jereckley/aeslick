@@ -2,7 +2,7 @@ import chalk from 'chalk';
 import * as fse from 'fs-extra';
 import * as path from 'path';
 import { defaultContextConfig } from '../create-component/context-input';
-import { ContextConfig } from '../../services/config/types';
+import { ContextConfig, ProjectWrapper } from '../../services/config/types';
 export type CreateProjectConfigAnswers = {
   configFileName: string;
   projectName: string;
@@ -17,8 +17,8 @@ export const createProjectConfig = async (
 ) => {
   const {
     configFileName,
-    projectName,
-    projectPath,
+    projectName: repoName,
+    projectPath: repoPath,
     framework,
     generatedCodegenTypesPath,
     developerConcerns,
@@ -43,25 +43,23 @@ export const createProjectConfig = async (
     .map((concern) => concern.trim())
     .filter((concern) => concern.length > 0);
 
-  const content = [
-    {
-      context: {
-        input: defaultContextConfig as ContextConfig,
-      },
-      repos: [
-        {
-          name: projectName,
-          path: projectPath,
-          details: {
-            framework,
-            generatedCodegenTypesPath,
-            developerConcerns: concerns,
-          },
-        },
-      ],
+  const content: ProjectWrapper = {
+    projectName: repoName,
+    context: {
+      input: defaultContextConfig,
     },
-  ];
-
+    repos: [
+      {
+        name: repoName,
+        path: repoPath,
+        details: {
+          framework,
+          generatedCodegenTypesPath,
+          developerConcerns: concerns,
+        },
+      },
+    ],
+  };
   await fse.writeJson(writePath, content, { spaces: 2 });
 
   console.log(chalk.green(`Created project config at ${writePath}`));

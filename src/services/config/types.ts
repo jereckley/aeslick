@@ -18,22 +18,27 @@ export type ContextWrapper = {
   input?: ContextConfig;
 };
 
-export type ProjectConfigWrapper = {
-  configName: string;
-  context?: ContextWrapper;
-  repos: ProjectDetails[];
+export type RepoConfigWrapper = {
+  projectName: string;
+  repoName: string;
+  repo: Repo;
 };
 
-export type ProjectDetails = {
+export type ProjectWrapper = {
+  projectName: string;
+  context: ContextWrapper;
+  repos: Repo[];
+};
+export type Repo = {
   name: string;
   path: string;
-  details: ProjectConfig;
+  details: RepoConfig;
 };
 export type AgentConfig = {
   notes: string;
 };
 
-export type ProjectConfig = {
+export type RepoConfig = {
   framework: string;
   generatedCodegenTypesPath: string;
   developerConcerns: string[];

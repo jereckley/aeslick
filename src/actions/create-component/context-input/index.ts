@@ -1,19 +1,10 @@
-import { ContextConfig, ContextKeys } from '../../../services/config/types';
+import { ContextConfig } from '../../../services/config/types';
 import { authentication } from './authentication';
 import { configurations } from './configurations';
 import { graphql } from './graphql';
 import { init } from './init';
 import { interaction } from './interaction';
 import { style } from './style';
-
-const contextOrder: ContextKeys[] = [
-  'init',
-  'interaction',
-  'configurations',
-  'style',
-  'authentication',
-  'graphql',
-];
 
 export const defaultContextConfig: ContextConfig = {
   init,
@@ -24,13 +15,8 @@ export const defaultContextConfig: ContextConfig = {
   graphql,
 };
 
-export const buildContextInput = (contextConfig?: ContextConfig): string[] => {
-  const mergedContext = {
-    ...defaultContextConfig,
-    ...(contextConfig ?? {}),
-  };
-
-  return contextOrder
-    .map((key) => mergedContext[key])
-    .filter((section): section is string => !!section);
+export const buildContextInput = (contextConfig?: ContextConfig): string => {
+  return contextConfig
+    ? JSON.stringify(contextConfig)
+    : JSON.stringify(defaultContextConfig);
 };
