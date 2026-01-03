@@ -42,5 +42,4 @@ export type RepoConfig = {
   framework: string;
   generatedCodegenTypesPath: string;
   developerConcerns: string[];
-  agent?: AgentConfig;
 };
