@@ -12,7 +12,8 @@ export const getConfigByNameTool: FunctionTool = {
   type: 'function',
   strict: true,
   name: 'get-config-by-name',
-  description: 'Get the configuration of a project by its name.',
+  description:
+    'Get the configuration (list of repos) for a project config by its name.',
   parameters: {
     type: 'object',
     properties: {
