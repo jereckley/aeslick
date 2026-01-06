@@ -22,16 +22,21 @@ export const engine = async (answers: CreateComponentAnswers) => {
   const repoConfigsAvailable = configSvc.projectRepoConfigsAvailable();
   const projects = configSvc.getNamesOfProjectsAvailable();
   console.log('Project configs available:', projects.join(', '));
-  const contextConfig =
-    projects.length === 1 
+  const contextConfig = buildContextInput(
+    projects.length === 1
       ? configSvc.getProjectContextConfig(projects[0])
-      : undefined;
+      : undefined,
+  );
 
   if (!projects.length) {
     throw new Error('No projects available in configuration.');
   }
 
-  let prompts = contextConfig ? buildContextInput(contextConfig) : 'Prompt user for what project they are working on if they do ont specify it.';
+  if(projects.length > 1) {
+    throw new Error('Multiple projects detected. Support for more than one project is not yet implemented.');
+  }
+
+  let prompts = contextConfig;
   prompts += `\n\nThe following projects are available: ${projects.join(', ')}.`;
   prompts += `\n\nThe following repo configurations are available: ${repoConfigsAvailable.join(', ')}. You can use the get-config-by-name tool to get the configuration of a specific project.`;
   prompts += `\n\nUser Prompt: "${answers.componentDescription}"`;
