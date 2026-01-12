@@ -2,6 +2,11 @@ import { ResponseCreateParamsBase } from 'openai/resources/responses/responses';
 
 export type BaseConfig = {
   model: ResponseCreateParamsBase['model'];
+  /**
+   * Maximum number of characters from tool output to return to the model.
+   * Defaults to 12000 if not specified in base config.
+   */
+  maxFunctionOutputLength?: number;
 };
 
 export type ContextKeys =

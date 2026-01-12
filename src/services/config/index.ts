@@ -7,6 +7,7 @@ import {
 } from './types';
 
 export const DEFAULT_MODEL = 'gpt-5.2';
+export const DEFAULT_MAX_FUNCTION_OUTPUT_LENGTH = 12000;
 
 let baseConfig: BaseConfig | undefined;
 let repoConfigs: RepoConfigWrapper[] = [];
@@ -15,6 +16,7 @@ export const configService = async () => {
   if (!baseConfig) {
     baseConfig = {
       model: DEFAULT_MODEL,
+      maxFunctionOutputLength: DEFAULT_MAX_FUNCTION_OUTPUT_LENGTH,
     };
   }
   if (repoConfigs.length === 0) {
@@ -30,6 +32,7 @@ export const configService = async () => {
         if (name) {
           if (name === 'base') {
             baseConfig = {
+              ...baseConfig,
               ...(config as BaseConfig),
             };
           } else {

@@ -9,17 +9,15 @@ import {
   Tool,
 } from 'openai/resources/responses/responses';
 import { functionMap } from '../../../tools';
-import { configService } from '../../config';
+import {
+  DEFAULT_MAX_FUNCTION_OUTPUT_LENGTH,
+  configService,
+} from '../../config';
 import { promptForInput } from '../../../tools/prompt-for-input';
 import { fileService } from '../../files';
 import * as fse from 'fs-extra';
 import * as path from 'path';
-import {
-  StreamedResponse,
-  streamResponseWithRetry,
-} from '../streaming';
-
-const MAX_FUNCTION_OUTPUT_LENGTH = 12000;
+import { StreamedResponse, streamResponseWithRetry } from '../streaming';
 
 export const processResponse =
   (client: OpenAI, tools: Tool[]) =>
@@ -31,6 +29,9 @@ export const processResponse =
       console.log(
         chalk.greenBright(`Conversation continues (response id: ${res.id})`),
       );
+      const baseConfig = (await configService()).baseConfig();
+      const maxFunctionOutputLength =
+        baseConfig.maxFunctionOutputLength ?? DEFAULT_MAX_FUNCTION_OUTPUT_LENGTH;
       const newList: ResponseInputItem[] = [];
       const fService = await fileService();
       const unrecognizedItems: ResponseOutputItem[] = [];
@@ -54,7 +55,10 @@ export const processResponse =
               item.name as keyof typeof functionMap
             ](item.arguments);
             console.log(chalk.cyan(`Tool "${item.name}" completed.`));
-            const formattedOutput = serializeFunctionOutput(funcRes);
+            const formattedOutput = serializeFunctionOutput(
+              funcRes,
+              maxFunctionOutputLength,
+            );
             newList.push({
               type: 'function_call_output',
               call_id: item.call_id,
@@ -127,7 +131,6 @@ export const processResponse =
           role: 'user',
         } satisfies EasyInputMessage);
       }
-      const baseConfig = (await configService()).baseConfig();
       console.log(chalk.blue('Requesting next response from OpenAI...'));
       const nextResponse = await streamResponseWithRetry(client, {
         model: baseConfig.model,
@@ -223,19 +226,22 @@ const truncateForLog = (text: string, limit = 600) => {
   return `${text.slice(0, limit)}... [truncated ${remaining} characters]`;
 };
 
-const serializeFunctionOutput = (output: unknown) => {
+const serializeFunctionOutput = (
+  output: unknown,
+  maxFunctionOutputLength: number,
+) => {
   const serialized = safeStringify(output);
-  if (serialized.length <= MAX_FUNCTION_OUTPUT_LENGTH) {
+  if (serialized.length <= maxFunctionOutputLength) {
     return serialized;
   }
 
   console.log(
     chalk.yellow(
-      `Tool output length ${serialized.length} exceeded ${MAX_FUNCTION_OUTPUT_LENGTH} characters; truncating to avoid context window errors.`,
+      `Tool output length ${serialized.length} exceeded ${maxFunctionOutputLength} characters; truncating to avoid context window errors.`,
     ),
   );
 
-  const truncated = serialized.slice(0, MAX_FUNCTION_OUTPUT_LENGTH);
+  const truncated = serialized.slice(0, maxFunctionOutputLength);
   return safeStringify({
     truncated: true,
     original_length: serialized.length,
