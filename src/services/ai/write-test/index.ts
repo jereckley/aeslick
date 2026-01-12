@@ -1,7 +1,7 @@
-import chalk from 'chalk';
 import type OpenAI from 'openai';
 import * as fse from 'fs-extra';
 import * as path from 'path';
+import { streamResponseWithRetry } from '../streaming';
 
 const root = process.cwd();
 export const writeTest =
@@ -43,13 +43,13 @@ ${filePath}
       'Now write tests for this file using the same instructions an the original prompt: ' +
       filePath;
 
-    const res = await client.responses.create({
+    const res = await streamResponseWithRetry(client, {
       model: 'o3-pro-2025-06-10',
       input: responseId ? followUpPrompt : prompt,
       reasoning: { effort: 'high' },
       previous_response_id: responseId,
     });
-    for (const item of res.output) {
+    for (const item of res.output || []) {
       if (item.type === 'message') {
         for (const content of item.content) {
           if (content.type === 'output_text') {

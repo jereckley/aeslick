@@ -12,16 +12,22 @@ import { functionMap } from '../../../tools';
 import { configService } from '../../config';
 import { promptForInput } from '../../../tools/prompt-for-input';
 import { fileService } from '../../files';
-import { setTimeout as delay } from 'timers/promises';
 import * as fse from 'fs-extra';
 import * as path from 'path';
+import {
+  StreamedResponse,
+  streamResponseWithRetry,
+} from '../streaming';
 
 const MAX_FUNCTION_OUTPUT_LENGTH = 12000;
 
 export const processResponse =
-  (client: OpenAI, tools: Tool[]) => async (res: Response) => {
+  (client: OpenAI, tools: Tool[]) =>
+  async (res: Response | StreamedResponse) => {
     try {
       const items = res.output || [];
+      const streamed = Boolean((res as StreamedResponse).__streamed);
+      const shouldLogMessages = !streamed;
       console.log(
         chalk.greenBright(`Conversation continues (response id: ${res.id})`),
       );
@@ -67,7 +73,7 @@ export const processResponse =
               output: JSON.stringify({ error: errorMessage }),
             });
           }
-        } else if (item.type === 'message') {
+        } else if (item.type === 'message' && shouldLogMessages) {
           item.content.forEach((content) => {
             if (content.type === 'output_text') {
               console.log(chalk.white(`Assistant: ${content.text}`));
@@ -123,7 +129,7 @@ export const processResponse =
       }
       const baseConfig = (await configService()).baseConfig();
       console.log(chalk.blue('Requesting next response from OpenAI...'));
-      const nextResponse = await createResponseWithRetry(client, {
+      const nextResponse = await streamResponseWithRetry(client, {
         model: baseConfig.model,
         reasoning: { effort: 'medium' },
         tools,
@@ -145,41 +151,6 @@ export const processResponse =
       return await forwardErrorToOpenAi(client, tools, res, error);
     }
   };
-
-type CreateResponseParams = Omit<
-  Parameters<OpenAI['responses']['create']>[0],
-  'stream'
-> & { stream?: false };
-
-const createResponseWithRetry = async (
-  client: OpenAI,
-  params: CreateResponseParams,
-): Promise<Response> => {
-  const maxRetries = 3;
-  let delayMs = 1000;
-  let attempt = 0;
-
-  while (true) {
-    try {
-      const response = await client.responses.create(params);
-      return response as Response;
-    } catch (error: any) {
-      if (isRateLimitError(error) && attempt < maxRetries) {
-        console.log(
-          chalk.yellow(
-            `Rate limit hit from OpenAI (attempt ${attempt + 1}/${maxRetries}). Retrying in ${delayMs}ms...`,
-          ),
-        );
-        await delay(delayMs);
-        attempt += 1;
-        delayMs *= 2;
-        continue;
-      }
-
-      throw error;
-    }
-  }
-};
 
 const sortItems = (items: ResponseOutputItem[]) => {
   const functionCalls = items.filter((i) => i.type === 'function_call');
@@ -303,15 +274,6 @@ const formatErrorMessage = (error: unknown) => {
   }
 };
 
-const isRateLimitError = (error: any) => {
-  const status =
-    error?.status ??
-    error?.statusCode ??
-    error?.cause?.status ??
-    error?.response?.status;
-  return status === 429;
-};
-
 const persistConversationId = async (responseId: string) => {
   const filePath = path.join(process.cwd(), 'conv.txt');
   const line = `${new Date().toISOString()} - ${responseId}\n`;
@@ -326,7 +288,7 @@ const persistConversationId = async (responseId: string) => {
 const forwardErrorToOpenAi = async (
   client: OpenAI,
   tools: Tool[],
-  res: Response,
+  res: Response | StreamedResponse,
   error: unknown,
 ) => {
   const baseConfig = (await configService()).baseConfig();
@@ -335,7 +297,7 @@ const forwardErrorToOpenAi = async (
     console.log(
       chalk.yellow('Attempting to forward the error back to OpenAI...'),
     );
-    const nextResponse = await createResponseWithRetry(client, {
+    const nextResponse = await streamResponseWithRetry(client, {
       model: baseConfig.model,
       reasoning: { effort: 'medium' },
       tools,

@@ -4,8 +4,8 @@ import * as path from 'path';
 import { defaultContextConfig } from '../create-component/context-input';
 import { ContextConfig, ProjectWrapper } from '../../services/config/types';
 export type CreateProjectConfigAnswers = {
-  configFileName: string;
   projectName: string;
+  repoName: string;
   projectPath: string;
   framework: string;
   generatedCodegenTypesPath: string;
@@ -15,52 +15,57 @@ export type CreateProjectConfigAnswers = {
 export const createProjectConfig = async (
   answers: CreateProjectConfigAnswers,
 ) => {
-  const {
-    configFileName,
-    projectName: repoName,
-    projectPath: repoPath,
-    framework,
-    generatedCodegenTypesPath,
-    developerConcerns,
-  } = answers;
+  try {
+    const {
+      projectName,
+      repoName,
+      projectPath: repoPath,
+      framework,
+      generatedCodegenTypesPath,
+      developerConcerns,
+    } = answers;
 
-  const fileName = configFileName.endsWith('.aeslick.json')
-    ? configFileName
-    : `${configFileName}.aeslick.json`;
-  const writePath = path.join(process.cwd(), fileName);
+    const fileName = projectName.endsWith('.aeslick.json')
+      ? projectName
+      : `${projectName}.aeslick.json`;
+    const writePath = path.join(process.cwd(), fileName);
 
-  if (fse.existsSync(writePath)) {
-    console.log(
-      chalk.yellow(
-        `Project config ${fileName} already exists. Aborting creation.`,
-      ),
-    );
-    return;
-  }
+    if (fse.existsSync(writePath)) {
+      console.log(
+        chalk.yellow(
+          `Project config ${fileName} already exists. Aborting creation.`,
+        ),
+      );
+      return;
+    }
 
-  const concerns = (developerConcerns ?? '')
-    .split(',')
-    .map((concern) => concern.trim())
-    .filter((concern) => concern.length > 0);
+    const concerns = (developerConcerns ?? '')
+      .split(',')
+      .map((concern) => concern.trim())
+      .filter((concern) => concern.length > 0);
 
-  const content: ProjectWrapper = {
-    projectName: repoName,
-    context: {
-      input: defaultContextConfig,
-    },
-    repos: [
-      {
-        name: repoName,
-        path: repoPath,
-        details: {
-          framework,
-          generatedCodegenTypesPath,
-          developerConcerns: concerns,
-        },
+    const content: ProjectWrapper = {
+      projectName: repoName,
+      context: {
+        input: defaultContextConfig,
       },
-    ],
-  };
-  await fse.writeJson(writePath, content, { spaces: 2 });
+      repos: [
+        {
+          name: repoName,
+          path: repoPath,
+          details: {
+            framework,
+            generatedCodegenTypesPath,
+            developerConcerns: concerns,
+          },
+        },
+      ],
+    };
+    await fse.writeJson(writePath, content, { spaces: 2 });
 
-  console.log(chalk.green(`Created project config at ${writePath}`));
+    console.log(chalk.green(`Created project config at ${writePath}`));
+  } catch (error) {
+    console.error(chalk.red('Error creating project config:'), error);
+    throw error;
+  }
 };

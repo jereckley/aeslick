@@ -1,20 +1,16 @@
 import chalk from 'chalk';
 import type OpenAI from 'openai';
+import { streamResponseWithRetry } from '../streaming';
 
-export const giveInfo = (client: OpenAI) => async (text: string, responseId?: string) => {
-  const res = await client.responses.create({
-    model: 'o3-pro-2025-06-10',
-    input: text,
-    previous_response_id: responseId,
-  });
-  res.output.forEach((item) => {
-    if (item.type === 'message') {
-      item.content.forEach((content) => {
-        if (content.type === 'output_text') {
-          console.log(chalk.white(content.text));
-        }
-      });
+export const giveInfo =
+  (client: OpenAI) => async (text: string, responseId?: string) => {
+    const res = await streamResponseWithRetry(client, {
+      model: 'o3-pro-2025-06-10',
+      input: text,
+      previous_response_id: responseId,
+    });
+    if (!res.output?.length) {
+      console.log(chalk.yellow('No output received from OpenAI.'));
     }
-  });
-  return res.id;
-};
+    return res.id;
+  };

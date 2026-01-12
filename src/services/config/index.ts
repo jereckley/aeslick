@@ -6,13 +6,15 @@ import {
   ProjectWrapper,
 } from './types';
 
+export const DEFAULT_MODEL = 'gpt-5.2';
+
 let baseConfig: BaseConfig | undefined;
 let repoConfigs: RepoConfigWrapper[] = [];
 let projects: ProjectWrapper[] = [];
 export const configService = async () => {
   if (!baseConfig) {
     baseConfig = {
-      model: 'gpt-5-mini-2025-08-07',
+      model: DEFAULT_MODEL,
     };
   }
   if (repoConfigs.length === 0) {

@@ -1,4 +1,5 @@
 import { Questions } from 'inquirer';
+import { DEFAULT_MODEL } from '../services/config';
 
 export const CHAT_QUESTIONS: Questions = [
   {
@@ -44,12 +45,12 @@ export const CREATE_COMPONENT: Questions = [
 export const CREATE_PROJECT_CONFIG: Questions = [
   {
     type: 'input',
-    name: 'Project Name',
+    name: 'projectName',
     message: 'Project Name:',
   },
   {
     type: 'input',
-    name: 'projectName',
+    name: 'repoName',
     message: 'First repo name:',
   },
   {
@@ -71,5 +72,14 @@ export const CREATE_PROJECT_CONFIG: Questions = [
     type: 'input',
     name: 'developerConcerns',
     message: 'First repos developer concerns (comma separated):',
+  },
+];
+
+export const CREATE_BASE_CONFIG: Questions = [
+  {
+    type: 'input',
+    name: 'model',
+    message: 'Default model to use:',
+    default: DEFAULT_MODEL,
   },
 ];

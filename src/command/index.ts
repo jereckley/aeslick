@@ -2,6 +2,7 @@ import { namespace } from '../namespace/namespaces.enum';
 import { Command } from './command.enum';
 import {
   CHAT_QUESTIONS,
+  CREATE_BASE_CONFIG,
   CREATE_COMPONENT,
   CREATE_PROJECT_CONFIG,
   WRITE_TEST,
@@ -11,6 +12,7 @@ import { Commands } from './types';
 import { tests } from '../actions/tests';
 import { createComponent } from '../actions/create-component';
 import { createProjectConfig } from '../actions/create-project-config';
+import { createBaseConfig } from '../actions/create-base-config';
 
 export const commands: Commands = {
   [namespace.CHAT]: {
@@ -30,6 +32,11 @@ export const commands: Commands = {
       id: Command.CREATE_PROJECT_CONFIG,
       questions: CREATE_PROJECT_CONFIG,
       creator: createProjectConfig,
+    },
+    [Command.CREATE_BASE_CONFIG]: {
+      id: Command.CREATE_BASE_CONFIG,
+      questions: CREATE_BASE_CONFIG,
+      creator: createBaseConfig,
     },
   },
   [namespace.COMPONENT]: {
