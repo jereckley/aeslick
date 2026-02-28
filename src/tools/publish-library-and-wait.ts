@@ -115,13 +115,8 @@ export const publishLibraryAndWait = async (input: string) => {
       data.pathToRepo,
     );
     const parsed = JSON.parse(runsJson) as GhRun[];
-    console.log(parsed)
-    const matching = getMatchingRuns(parsed, commitSha, data.packageName).sort((a, b) =>
-      b.createdAt.localeCompare(a.createdAt),
-    );
-
-    if (matching.length > 0) {
-      latestRun = matching[0];
+    if (parsed.length > 0) {
+      latestRun = parsed[0];
       if (latestRun.status === 'completed') {
         break;
       }
@@ -177,25 +172,32 @@ export const publishLibraryAndWaitTool: FunctionTool = {
         description: 'Fix commit message used for upfix/fallback git commit.',
       },
       upfixCommand: {
-        type: 'string',
+        type: ['string', 'null'],
         description:
           'Optional command used for publish commit/push (default: "upfix").',
       },
       packageName: {
-        type: 'string',
+        type: ['string', 'null'],
         description:
           'Optional package/workflow text filter used when selecting the target run.',
       },
       pollIntervalSeconds: {
-        type: 'number',
+        type: ['number', 'null'],
         description: 'Optional polling interval for gh run checks (default: 15).',
       },
       timeoutMinutes: {
-        type: 'number',
+        type: ['number', 'null'],
         description: 'Optional timeout in minutes while waiting for completion (default: 20).',
       },
     },
-    required: ['pathToRepo', 'commitMessage'],
+    required: [
+      'pathToRepo',
+      'commitMessage',
+      'upfixCommand',
+      'packageName',
+      'pollIntervalSeconds',
+      'timeoutMinutes',
+    ],
     additionalProperties: false,
   },
 };

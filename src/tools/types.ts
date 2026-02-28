@@ -37,8 +37,10 @@ export type PublishLibraryAndWaitInput = {
   timeoutMinutes?: number;
 }
 
-export type PublishRepoInput = {
+export type DeployRepoInput = {
   pathToRepo: string;
+  commitMessage: string;
   deployEnv: 'dev' | 'test' | 'prod';
+  upitCommand?: string;
   workflowFileName?: string;
 }

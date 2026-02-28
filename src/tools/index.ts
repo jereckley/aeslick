@@ -10,7 +10,7 @@ import {
   publishLibraryAndWait,
   publishLibraryAndWaitTool,
 } from './publish-library-and-wait';
-import { publishRepo, publishRepoTool } from './publish-repo';
+import { deployRepo, deployRepoTool } from './deploy-repo';
 import { runNpmCommand, runNpmCommandTool } from './run-npm-command';
 import { writeFile, writeFileTool } from './write-files';
 
@@ -23,7 +23,7 @@ export const functionMap = {
   'get-image-by-path': getImageByPath,
   'run-npm-command': runNpmCommand,
   'publish-library-and-wait': publishLibraryAndWait,
-  'publish-repo': publishRepo,
+  'deploy-repo': deployRepo,
 };
 
 export const functionDefinitionsMap = {
@@ -35,5 +35,5 @@ export const functionDefinitionsMap = {
   'get-image-by-path': getImageByPathTool,
   'run-npm-command': runNpmCommandTool,
   'publish-library-and-wait': publishLibraryAndWaitTool,
-  'publish-repo': publishRepoTool,
+  'deploy-repo': deployRepoTool,
 };
