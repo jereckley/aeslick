@@ -27,3 +27,18 @@ export type GetListOfFilesInPathInput = {
 export type PromptForInputInput = {
   prompt: string;
 }
+
+export type PublishLibraryAndWaitInput = {
+  pathToRepo: string;
+  commitMessage: string;
+  upfixCommand?: string;
+  packageName?: string;
+  pollIntervalSeconds?: number;
+  timeoutMinutes?: number;
+}
+
+export type PublishRepoInput = {
+  pathToRepo: string;
+  deployEnv: 'dev' | 'test' | 'prod';
+  workflowFileName?: string;
+}

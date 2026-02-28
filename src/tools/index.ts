@@ -6,6 +6,11 @@ import {
   getListOfFilesInPathTool,
 } from './get-list-of-files-in-path';
 import { promptForInput, promptForInputTool } from './prompt-for-input';
+import {
+  publishLibraryAndWait,
+  publishLibraryAndWaitTool,
+} from './publish-library-and-wait';
+import { publishRepo, publishRepoTool } from './publish-repo';
 import { runNpmCommand, runNpmCommandTool } from './run-npm-command';
 import { writeFile, writeFileTool } from './write-files';
 
@@ -17,6 +22,8 @@ export const functionMap = {
   'get-file-by-path': getFileByPath,
   'get-image-by-path': getImageByPath,
   'run-npm-command': runNpmCommand,
+  'publish-library-and-wait': publishLibraryAndWait,
+  'publish-repo': publishRepo,
 };
 
 export const functionDefinitionsMap = {
@@ -27,4 +34,6 @@ export const functionDefinitionsMap = {
   'get-file-by-path': getFileByPathTool,
   'get-image-by-path': getImageByPathTool,
   'run-npm-command': runNpmCommandTool,
+  'publish-library-and-wait': publishLibraryAndWaitTool,
+  'publish-repo': publishRepoTool,
 };

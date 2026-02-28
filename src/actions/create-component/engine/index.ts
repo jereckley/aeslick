@@ -16,6 +16,8 @@ export const engine = async (answers: CreateComponentAnswers) => {
     functionDefinitionsMap['get-image-by-path'],
     { type: 'image_generation' },
     functionDefinitionsMap['run-npm-command'],
+    functionDefinitionsMap['publish-library-and-wait'],
+    functionDefinitionsMap['publish-repo'],
   ];
   const aiService = await getAiService(tools);
   const configSvc = await configService();
