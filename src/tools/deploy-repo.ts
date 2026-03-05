@@ -5,13 +5,18 @@ import { promisify } from 'util';
 
 const execAsync = promisify(exec);
 const ALLOWED_ENVS = new Set(['dev', 'test', 'prod']);
-const DEFAULT_UPIT_COMMAND = 'upit';
 const quote = (value: string) => value.replaceAll('"', '\\"');
+const runCommand = async (command: string, cwd: string) => {
+  return execAsync(command, {
+    cwd,
+    maxBuffer: 1024 * 1024 * 10,
+  });
+};
 
 export const deployRepo = async (input: string) => {
   const data = JSON.parse(input) as DeployRepoInput;
   const workflowFileName = data.workflowFileName || 'launch.yml';
-  const upitCommand = data.upitCommand || DEFAULT_UPIT_COMMAND;
+  const logs: string[] = [];
 
   if (!ALLOWED_ENVS.has(data.deployEnv)) {
     return {
@@ -21,26 +26,76 @@ export const deployRepo = async (input: string) => {
   }
 
   try {
-    const upitExecCommand = `${upitCommand} "${quote(data.commitMessage)}"`;
-    await execAsync(upitExecCommand, {
-      cwd: data.pathToRepo,
-      maxBuffer: 1024 * 1024 * 10,
-    });
+    const { stdout: currentBranchRaw } = await runCommand(
+      'git rev-parse --abbrev-ref HEAD',
+      data.pathToRepo,
+    );
+    const branch = currentBranchRaw.trim();
+    logs.push(`[deploy-repo] Current branch detected: ${branch}`);
+
+    const { stdout: statusRaw } = await runCommand(
+      'git status --porcelain',
+      data.pathToRepo,
+    );
+    const hasChanges = statusRaw.trim().length > 0;
+    logs.push(
+      `[deploy-repo] Pre-deploy status: ${hasChanges ? 'changes detected' : 'no changes, creating empty commit'}.`,
+    );
+
+    const gitCommands = {
+      add: 'git add -A',
+      commit: hasChanges
+        ? `git commit -m "${quote(data.commitMessage)}"`
+        : `git commit --allow-empty -m "${quote(data.commitMessage)}"`,
+      push: `git push origin ${branch}`,
+    };
+
+    if (hasChanges) {
+      logs.push(`[deploy-repo] Running pre-deploy command: ${gitCommands.add}`);
+      await runCommand(gitCommands.add, data.pathToRepo);
+    }
+
+    logs.push(`[deploy-repo] Running pre-deploy command: ${gitCommands.commit}`);
+    await runCommand(gitCommands.commit, data.pathToRepo);
+    logs.push('[deploy-repo] Commit step completed.');
+
+    logs.push(`[deploy-repo] Running pre-deploy command: ${gitCommands.push}`);
+    const { stdout: pushStdout, stderr: pushStderr } = await runCommand(
+      gitCommands.push,
+      data.pathToRepo,
+    );
+    logs.push('[deploy-repo] Push step completed.');
+    if ((pushStdout || '').trim()) {
+      logs.push(`[deploy-repo] git push stdout: ${pushStdout.trim()}`);
+    }
+    if ((pushStderr || '').trim()) {
+      logs.push(`[deploy-repo] git push stderr: ${pushStderr.trim()}`);
+    }
 
     const deployCommand = `gh workflow run ${workflowFileName} --field deployEnv=${data.deployEnv}`;
-    const { stdout, stderr } = await execAsync(deployCommand, {
-      cwd: data.pathToRepo,
-      maxBuffer: 1024 * 1024 * 10,
-    });
+    logs.push(`[deploy-repo] Triggering workflow: ${deployCommand}`);
+    const { stdout, stderr } = await runCommand(deployCommand, data.pathToRepo);
+    logs.push('[deploy-repo] Workflow dispatch command completed.');
 
     return {
       success: true,
-      upitCommand: upitExecCommand,
+      preDeployCommands: gitCommands,
       deployCommand,
       output: stdout?.trim() ?? '',
       errorOutput: stderr?.trim() ?? '',
+      logs,
     };
   } catch (error: any) {
+    logs.push('[deploy-repo] Failed while running git pre-deploy commands or dispatching workflow.');
+    if (error?.cmd) {
+      logs.push(`[deploy-repo] Failed command: ${error.cmd}`);
+    }
+    if (error?.stdout?.toString().trim()) {
+      logs.push(`[deploy-repo] error stdout: ${error.stdout.toString().trim()}`);
+    }
+    if (error?.stderr?.toString().trim()) {
+      logs.push(`[deploy-repo] error stderr: ${error.stderr.toString().trim()}`);
+    }
     return {
       success: false,
       message:
@@ -48,6 +103,7 @@ export const deployRepo = async (input: string) => {
         error?.stdout?.toString().trim() ||
         error?.message ||
         'Unknown error running gh workflow.',
+      logs,
     };
   }
 };
@@ -57,7 +113,7 @@ export const deployRepoTool: FunctionTool = {
   strict: true,
   name: 'deploy-repo',
   description:
-    'Trigger a GitHub Actions workflow dispatch to publish/deploy a repository environment.',
+    'Trigger a GitHub Actions workflow dispatch to deploy a repository environment. This command will push the changes for the current branch to github before deploying',
   parameters: {
     type: 'object',
     properties: {
@@ -67,17 +123,12 @@ export const deployRepoTool: FunctionTool = {
       },
       commitMessage: {
         type: 'string',
-        description: 'Commit message passed to upit before triggering deployment.',
+        description: 'Commit message used before pushing and triggering deployment.',
       },
       deployEnv: {
         type: 'string',
         enum: ['dev', 'test', 'prod'],
         description: 'Deployment environment: dev, test, or prod.',
-      },
-      upitCommand: {
-        type: ['string', 'null'],
-        description:
-          'Optional command used for commit/push before deployment (default: "upit").',
       },
       workflowFileName: {
         type: ['string', 'null'],
@@ -89,7 +140,6 @@ export const deployRepoTool: FunctionTool = {
       'pathToRepo',
       'commitMessage',
       'deployEnv',
-      'upitCommand',
       'workflowFileName',
     ],
     additionalProperties: false,

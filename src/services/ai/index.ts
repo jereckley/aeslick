@@ -15,13 +15,22 @@ export const getAiService = async (tools?: Tool[]) => {
   if (!!tools) {
     toolsCache = tools;
   }
-  if (!toolsCache) {
-    throw new Error('Tools are required for the first initialization');
-  }
   return {
-    giveInfo: giveInfo(client),
+    giveInfo: giveInfo(client, toolsCache),
     writeTest: writeTest(client),
-    startAgent: startAgent(client, toolsCache),
-    processResponse: processResponse(client, toolsCache),
+    startAgent: toolsCache
+      ? startAgent(client, toolsCache)
+      : async () => {
+          throw new Error(
+            'Tools are required to start the agent. Initialize getAiService with tools first.',
+          );
+        },
+    processResponse: toolsCache
+      ? processResponse(client, toolsCache)
+      : async () => {
+          throw new Error(
+            'Tools are required to process an agent response. Initialize getAiService with tools first.',
+          );
+        },
   };
 };

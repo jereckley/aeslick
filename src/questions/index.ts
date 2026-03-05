@@ -2,11 +2,6 @@ import { Questions } from 'inquirer';
 import { DEFAULT_MODEL } from '../services/config';
 
 export const CHAT_QUESTIONS: Questions = [
-  {
-    type: 'input',
-    name: 'prompt',
-    message: 'Yes?',
-  },
 ];
 export const CHAT_CONVERSATION: Questions = [
   {

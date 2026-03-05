@@ -49,7 +49,9 @@ async function run() {
 
       await commands[ns][command].creator(answers);
     } catch (error) {
-      console.error(chalk.red(`Error: ${JSON.stringify(error)}`));
+      const err = error as Error;
+      const message = err?.message ?? String(error);
+      console.error(chalk.red(`Error: ${message}`));
     }
   } else {
     console.log(chalk.yellow('Solid miss'));

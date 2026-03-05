@@ -40,9 +40,19 @@ const runUpfixOrFallback = async (
 ) => {
   let strategy: 'upfix' | 'git-fallback' = 'upfix';
   let upfixError = '';
+  const logs: string[] = [];
 
   try {
-    await runCommand(`${upfixCommand} "${quote(message)}"`, repoPath);
+    const upfixExecCommand = `${upfixCommand} "${quote(message)}"`;
+    logs.push(`[publish-library-and-wait] Running upfix command: ${upfixExecCommand}`);
+    const { stdout, stderr } = await runCommand(upfixExecCommand, repoPath);
+    logs.push('[publish-library-and-wait] upfix command completed successfully.');
+    if ((stdout || '').trim()) {
+      logs.push(`[publish-library-and-wait] upfix stdout: ${stdout.trim()}`);
+    }
+    if ((stderr || '').trim()) {
+      logs.push(`[publish-library-and-wait] upfix stderr: ${stderr.trim()}`);
+    }
   } catch (error: any) {
     strategy = 'git-fallback';
     upfixError =
@@ -50,25 +60,46 @@ const runUpfixOrFallback = async (
       error?.stdout?.toString().trim() ||
       error?.message ||
       'Unknown upfix error';
+    logs.push('[publish-library-and-wait] upfix failed. Falling back to raw git commands.');
+    if (error?.cmd) {
+      logs.push(`[publish-library-and-wait] upfix failed command: ${error.cmd}`);
+    }
+    if (error?.stdout?.toString().trim()) {
+      logs.push(
+        `[publish-library-and-wait] upfix failure stdout: ${error.stdout.toString().trim()}`,
+      );
+    }
+    if (error?.stderr?.toString().trim()) {
+      logs.push(
+        `[publish-library-and-wait] upfix failure stderr: ${error.stderr.toString().trim()}`,
+      );
+    }
 
     const { stdout: currentBranchRaw } = await runCommand(
       'git rev-parse --abbrev-ref HEAD',
       repoPath,
     );
     const branch = currentBranchRaw.trim();
+    logs.push(`[publish-library-and-wait] Fallback branch detected: ${branch}`);
     const { stdout: status } = await runCommand('git status --porcelain', repoPath);
     const hasChanges = status.trim().length > 0;
+    logs.push(
+      `[publish-library-and-wait] Fallback status: ${hasChanges ? 'changes detected' : 'no changes, creating empty commit'}.`,
+    );
 
     if (hasChanges) {
       await runCommand('git add -A', repoPath);
       await runCommand(`git commit -m "${quote(message)}"`, repoPath);
+      logs.push('[publish-library-and-wait] Fallback commit created from staged changes.');
     } else {
       await runCommand(`git commit --allow-empty -m "${quote(message)}"`, repoPath);
+      logs.push('[publish-library-and-wait] Fallback empty commit created.');
     }
     await runCommand(`git push origin ${branch}`, repoPath);
+    logs.push('[publish-library-and-wait] Fallback push completed.');
   }
 
-  return { strategy, upfixError };
+  return { strategy, upfixError, logs };
 };
 
 const getMatchingRuns = (runs: GhRun[], sha: string, packageName?: string) => {
@@ -77,13 +108,14 @@ const getMatchingRuns = (runs: GhRun[], sha: string, packageName?: string) => {
     return bySha;
   }
   const packageNameLower = packageName.toLowerCase();
-  return bySha.filter((run) => {
+  const byPackage = bySha.filter((run) => {
     return (
       run.workflowName.toLowerCase().includes(packageNameLower) ||
       run.name.toLowerCase().includes(packageNameLower) ||
       run.displayTitle.toLowerCase().includes(packageNameLower)
     );
   });
+  return byPackage.length > 0 ? byPackage : bySha;
 };
 
 export const publishLibraryAndWait = async (input: string) => {
@@ -106,7 +138,8 @@ export const publishLibraryAndWait = async (input: string) => {
   const commitSha = commitShaRaw.trim();
   const timeoutAt = startedAt + timeoutMinutes * 60 * 1000;
   let attempts = 0;
-  let latestRun: GhRun | undefined;
+  let matchedRun: GhRun | undefined;
+  const waitLogs = [...publishInfo.logs];
 
   while (Date.now() < timeoutAt) {
     attempts += 1;
@@ -115,11 +148,20 @@ export const publishLibraryAndWait = async (input: string) => {
       data.pathToRepo,
     );
     const parsed = JSON.parse(runsJson) as GhRun[];
-    if (parsed.length > 0) {
-      latestRun = parsed[0];
-      if (latestRun.status === 'completed') {
+
+    const matchingRuns = getMatchingRuns(parsed, commitSha, data.packageName || undefined);
+    if (matchingRuns.length > 0) {
+      matchedRun = matchingRuns[0];
+      waitLogs.push(
+        `[publish-library-and-wait] Attempt ${attempts}: matched run ${matchedRun.databaseId} (${matchedRun.status}${matchedRun.conclusion ? `/${matchedRun.conclusion}` : ''}).`,
+      );
+      if (matchedRun.status === 'completed') {
         break;
       }
+    } else {
+      waitLogs.push(
+        `[publish-library-and-wait] Attempt ${attempts}: no matching run yet for commit ${commitSha}.`,
+      );
     }
     await sleep(pollIntervalSeconds * 1000);
   }
@@ -129,16 +171,31 @@ export const publishLibraryAndWait = async (input: string) => {
     data.pathToRepo,
   );
 
-  if (!latestRun || latestRun.status !== 'completed') {
+  if (!matchedRun || matchedRun.status !== 'completed') {
     return {
       success: false,
       commitSha,
       publishStrategy: publishInfo.strategy,
       upfixError: publishInfo.upfixError,
+      publishLogs: waitLogs,
       attempts,
       timeoutMinutes,
       message:
-        'Workflow did not complete before timeout. Returning latest gh release list output.',
+        'Matching workflow run for pushed commit did not complete before timeout. Returning latest gh release list output.',
+      ghReleaseList: finalReleaseList,
+    };
+  }
+
+  if (matchedRun.conclusion !== 'success') {
+    return {
+      success: false,
+      commitSha,
+      publishStrategy: publishInfo.strategy,
+      upfixError: publishInfo.upfixError,
+      publishLogs: waitLogs,
+      attempts,
+      completedRun: matchedRun,
+      message: `Matching workflow completed with conclusion: ${matchedRun.conclusion || 'unknown'}.`,
       ghReleaseList: finalReleaseList,
     };
   }
@@ -148,8 +205,9 @@ export const publishLibraryAndWait = async (input: string) => {
     commitSha,
     publishStrategy: publishInfo.strategy,
     upfixError: publishInfo.upfixError,
+    publishLogs: waitLogs,
     attempts,
-    completedRun: latestRun,
+    completedRun: matchedRun,
     ghReleaseList: finalReleaseList,
   };
 };
