@@ -5,6 +5,8 @@ import { buildContextInput } from '../context-input';
 import { configService } from '../../../services/config';
 import { CreateComponentAnswers } from '..';
 import { promptForInput } from '../../../tools/prompt-for-input';
+import { saveLastComponentResponseId } from '../../../services/component-session';
+import { isRestartableResponse } from '../../../services/ai/is-restartable-response';
 
 export const engine = async (answers: CreateComponentAnswers) => {
   const tools: Tool[] = [
@@ -14,10 +16,13 @@ export const engine = async (answers: CreateComponentAnswers) => {
     functionDefinitionsMap['get-list-of-files-in-path'],
     functionDefinitionsMap['get-file-by-path'],
     functionDefinitionsMap['get-image-by-path'],
+    functionDefinitionsMap['get-image-inputs-by-file-names'],
     { type: 'image_generation' },
     functionDefinitionsMap['run-npm-command'],
     functionDefinitionsMap['publish-library-and-wait'],
     functionDefinitionsMap['deploy-repo'],
+    functionDefinitionsMap['inspect-webpage'],
+    functionDefinitionsMap['chrome-headless-browser'],
   ];
   const aiService = await getAiService(tools);
   const configSvc = await configService();
@@ -44,8 +49,24 @@ export const engine = async (answers: CreateComponentAnswers) => {
   prompts += `\n\nUser Prompt: "${answers.componentDescription}"`;
 
   let res: Response | undefined;
+  const previousResponseId = answers.previousResponseId;
 
-  if (!answers.componentDescription) {
+  if (previousResponseId && !answers.componentDescription) {
+    console.log(`Resume mode enabled (response id: ${previousResponseId})`);
+    res = await aiService.startAgent(
+      'Continue from where we left off and ask for any missing details before making more changes.',
+      previousResponseId,
+    );
+  } else if (answers.componentDescription) {
+    if (previousResponseId) {
+      console.log(
+        `Resume mode with new prompt (response id: ${previousResponseId})`,
+      );
+    } else {
+      console.log('Fresh mode with new prompt.');
+    }
+    res = await aiService.startAgent(prompts, previousResponseId);
+  } else {
     const message = await promptForInput(
       JSON.stringify({
         prompt:
@@ -62,11 +83,15 @@ export const engine = async (answers: CreateComponentAnswers) => {
         message.response,
       );
     }
-  } else {
-    res = await aiService.startAgent(prompts);
   }
 
+  if (isRestartableResponse(res)) {
+    await saveLastComponentResponseId(res.id);
+  }
   while (true) {
     res = await aiService.processResponse(res);
+    if (isRestartableResponse(res)) {
+      await saveLastComponentResponseId(res.id);
+    }
   }
 };

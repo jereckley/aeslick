@@ -20,6 +20,10 @@ export type GetImageByPathInput = {
   path: string;
 }
 
+export type GetImageInputsByFileNamesInput = {
+  fileNames: string[];
+}
+
 export type GetListOfFilesInPathInput = {
   path: string;
 }
@@ -42,4 +46,48 @@ export type DeployRepoInput = {
   commitMessage: string;
   deployEnv: 'dev' | 'test' | 'prod';
   workflowFileName?: string;
+}
+
+export type InspectWebpageInput = {
+  url: string;
+  maxChars?: number;
+}
+
+export type ChromeHeadlessBrowserAction =
+  | 'open'
+  | 'navigate'
+  | 'click'
+  | 'type'
+  | 'wait'
+  | 'evaluate'
+  | 'snapshot'
+  | 'console'
+  | 'screenshot'
+  | 'close'
+
+export type ChromeHeadlessBrowserInput = {
+  action: ChromeHeadlessBrowserAction;
+  sessionId?: string;
+  url?: string;
+  selector?: string;
+  text?: string;
+  script?: string;
+  timeoutMs?: number;
+  waitUntil?: 'load' | 'domcontentloaded' | 'networkidle0' | 'networkidle2';
+  width?: number;
+  height?: number;
+  executablePath?: string;
+  disableSandbox?: boolean;
+  acceptInsecureCerts?: boolean;
+  maxTextChars?: number;
+  sinceEventId?: number;
+  path?: string;
+  fullPage?: boolean;
+  delayMs?: number;
+  clearExisting?: boolean;
+  pressEnter?: boolean;
+  waitForNavigation?: boolean;
+  button?: 'left' | 'middle' | 'right';
+  visible?: boolean;
+  hidden?: boolean;
 }

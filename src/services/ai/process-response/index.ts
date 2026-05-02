@@ -18,6 +18,12 @@ import { fileService } from '../../files';
 import * as fse from 'fs-extra';
 import * as path from 'path';
 import { StreamedResponse, streamResponseWithRetry } from '../streaming';
+import { isRestartableResponse } from '../is-restartable-response';
+
+type ImageInputToolOutput = {
+  type: 'image_input';
+  image_url: string;
+};
 
 export const processResponse =
   (client: OpenAI, tools: Tool[]) =>
@@ -55,6 +61,24 @@ export const processResponse =
               item.name as keyof typeof functionMap
             ](item.arguments);
             console.log(chalk.cyan(`Tool "${item.name}" completed.`));
+            if (isImageInputToolOutput(funcRes)) {
+              newList.push({
+                type: 'function_call_output',
+                call_id: item.call_id,
+                output: safeStringify({
+                  attached_image_inputs: funcRes.length,
+                }),
+              });
+              newList.push({
+                type: 'message',
+                role: 'user',
+                content: funcRes.map((image) => ({
+                  type: 'input_image',
+                  image_url: image.image_url,
+                })) as any,
+              } as ResponseInputItem);
+              continue;
+            }
             const formattedOutput = serializeFunctionOutput(
               funcRes,
               maxFunctionOutputLength,
@@ -97,8 +121,8 @@ export const processResponse =
                 .replaceAll(' ', '_') +
               `.` +
               (item as any).output_format;
-            await fService.writeBase64Image('assets/' + fileName, img);
-            console.log(chalk.cyan(`Image saved to assets/${fileName}`));
+            await fService.writeBase64Image('assets/output/' + fileName, img);
+            console.log(chalk.cyan(`Image saved to assets/output/${fileName}`));
           }
           delete item.result;
           console.log(chalk.cyan('Image generation metadata processed.'));
@@ -139,12 +163,20 @@ export const processResponse =
         previous_response_id: res.id,
         input: newList,
       });
-      await persistConversationId(nextResponse.id);
-      console.log(
-        chalk.greenBright(
-          `New response received (id: ${nextResponse.id}). Stored in conv.txt for resume.`,
-        ),
-      );
+      if (isRestartableResponse(nextResponse)) {
+        await persistConversationId(nextResponse.id);
+        console.log(
+          chalk.greenBright(
+            `New response received (id: ${nextResponse.id}). Stored in conv.txt for resume.`,
+          ),
+        );
+      } else {
+        console.log(
+          chalk.greenBright(
+            `New response received (id: ${nextResponse.id}). Not stored for resume because it is not restartable.`,
+          ),
+        );
+      }
       return nextResponse;
     } catch (error) {
       console.error(
@@ -260,10 +292,29 @@ const safeStringify = (value: unknown): string => {
     }
     return JSON.stringify(String(value));
   } catch (error) {
-    return JSON.stringify({
-      note: `Unable to stringify tool output: ${formatErrorMessage(error)}`,
-    });
+  return JSON.stringify({
+    note: `Unable to stringify tool output: ${formatErrorMessage(error)}`,
+  });
   }
+};
+
+const isImageInputToolOutput = (
+  output: unknown,
+): output is ImageInputToolOutput[] => {
+  if (!Array.isArray(output)) {
+    return false;
+  }
+
+  return output.every((item) => {
+    if (!item || typeof item !== 'object') {
+      return false;
+    }
+    const candidate = item as Partial<ImageInputToolOutput>;
+    return (
+      candidate.type === 'image_input' &&
+      typeof candidate.image_url === 'string'
+    );
+  });
 };
 
 const formatErrorMessage = (error: unknown) => {
@@ -316,7 +367,9 @@ const forwardErrorToOpenAi = async (
         } satisfies EasyInputMessage,
       ],
     });
-    await persistConversationId(nextResponse.id);
+    if (isRestartableResponse(nextResponse)) {
+      await persistConversationId(nextResponse.id);
+    }
     return nextResponse;
   } catch (forwardingError) {
     console.error(

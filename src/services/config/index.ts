@@ -6,7 +6,7 @@ import {
   ProjectWrapper,
 } from './types';
 
-export const DEFAULT_MODEL = 'gpt-5.2';
+export const DEFAULT_MODEL = 'gpt-5.4';
 export const DEFAULT_MAX_FUNCTION_OUTPUT_LENGTH = 12000;
 
 let baseConfig: BaseConfig | undefined;

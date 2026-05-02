@@ -7,12 +7,21 @@ import {
   saveLastChatResponseId,
 } from '../../services/chat-session';
 import { functionDefinitionsMap } from '../../tools';
+import {
+  appendPromptHistory,
+  getPromptHistory,
+} from '../../services/prompt-history';
+import { isRestartableResponse } from '../../services/ai/is-restartable-response';
 
 export type ChatAnswers = {
   prompt?: string;
 };
 export const chat = async (arg: ChatAnswers) => {
-  const service = await getAiService([functionDefinitionsMap['write-file']]);
+  const service = await getAiService([
+    functionDefinitionsMap['write-file'],
+    functionDefinitionsMap['inspect-webpage'],
+    functionDefinitionsMap['chrome-headless-browser'],
+  ]);
   let activeResponseId = await getLastChatResponseId();
 
   if (activeResponseId) {
@@ -42,20 +51,25 @@ export const chat = async (arg: ChatAnswers) => {
       console.log(chalk.yellow('Message was empty. Add text and send again.'));
       continue;
     }
-    const responseIdNext = await service.giveInfo(
+    const response = await service.giveInfo(
       prompt,
       activeResponseId,
     );
-    await saveLastChatResponseId(responseIdNext);
-    activeResponseId = responseIdNext;
+    activeResponseId = response.id;
+    if (isRestartableResponse(response)) {
+      await saveLastChatResponseId(response.id);
+    }
   }
 };
 
 const promptForMultiline = async () => {
+  const history = await getPromptHistory('chat');
   const rl = readline.createInterface({
     input: process.stdin,
     output: process.stdout,
+    historySize: 200,
   });
+  (rl as unknown as { history: string[] }).history = [...history];
   console.log(chalk.gray('Enter message (multi-line). Type /send on its own line to submit.'));
   console.log(chalk.gray('Type /exit on an empty prompt to quit.'));
   console.log(chalk.gray('Type /new on an empty prompt to start a new thread.'));
@@ -63,21 +77,26 @@ const promptForMultiline = async () => {
   const lines: string[] = [];
   process.stdout.write('> ');
   return await new Promise<string>((resolve) => {
+    const finalize = async (value: string, entriesToSave?: string[]) => {
+      rl.close();
+      if (entriesToSave?.length) {
+        await appendPromptHistory('chat', entriesToSave);
+      }
+      resolve(value);
+    };
+
     rl.on('line', (line) => {
       const normalized = line.trim();
       if (!lines.length && normalized === '/exit') {
-        rl.close();
-        resolve('exit');
+        void finalize('exit');
         return;
       }
       if (!lines.length && normalized === '/new') {
-        rl.close();
-        resolve('new');
+        void finalize('new');
         return;
       }
       if (normalized === '/send') {
-        rl.close();
-        resolve(lines.join('\n'));
+        void finalize(lines.join('\n'), lines);
         return;
       }
       lines.push(line);

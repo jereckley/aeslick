@@ -30,11 +30,6 @@ export const WRITE_TEST: Questions = [
 ];
 
 export const CREATE_COMPONENT: Questions = [
-  {
-    type: 'input',
-    name: 'componentDescription',
-    message: 'Let\'s get started: ',
-  },
 ];
 
 export const CREATE_PROJECT_CONFIG: Questions = [

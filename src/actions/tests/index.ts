@@ -54,12 +54,12 @@ export const tests = async (answers: TestsAnswers) => {
 
 const keepAsking = async (responseId: string) => {
   const answers = await inquirer.prompt(CHAT_CONVERSATION);
-  const responseIdNext = await (
+  const response = await (
     await getAiService()
   ).giveInfo(answers.prompt, responseId);
   if (answers.prompt === 'exit') {
     console.log(chalk.bgMagentaBright('Exiting chat...'));
     return;
   }
-  keepAsking(responseIdNext);
+  keepAsking(response.id);
 };

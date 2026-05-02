@@ -5,4 +5,5 @@ Coding Style Guidelines:
 3. Use the types generated from codegen as much as possible instead of writing your own types when working in the 'GraphQL API' repo.
 4. Prefer arrow functions.
 5. Avoid Classes.
+6. Files should be small and focused on a single responsibility. If a file is getting too large, consider breaking it into smaller modules. Do not write files with more than 5000 characters if possible.
 `;
