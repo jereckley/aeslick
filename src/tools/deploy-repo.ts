@@ -1,21 +1,16 @@
 import { FunctionTool } from 'openai/resources/responses/responses';
 import { DeployRepoInput } from './types';
-import { exec } from 'child_process';
-import { promisify } from 'util';
+import { requireConfiguredRepoPath } from '../services/security/tool-access';
+import { requireSafeWorkflowFileName, runCommand } from './command-utils';
 
-const execAsync = promisify(exec);
 const ALLOWED_ENVS = new Set(['dev', 'test', 'prod']);
-const quote = (value: string) => value.replaceAll('"', '\\"');
-const runCommand = async (command: string, cwd: string) => {
-  return execAsync(command, {
-    cwd,
-    maxBuffer: 1024 * 1024 * 10,
-  });
-};
 
 export const deployRepo = async (input: string) => {
   const data = JSON.parse(input) as DeployRepoInput;
-  const workflowFileName = data.workflowFileName || 'launch.yml';
+  const workflowFileName = requireSafeWorkflowFileName(
+    data.workflowFileName || 'launch.yml',
+  );
+  const repoPath = await requireConfiguredRepoPath(data.pathToRepo);
   const logs: string[] = [];
 
   if (!ALLOWED_ENVS.has(data.deployEnv)) {
@@ -27,42 +22,41 @@ export const deployRepo = async (input: string) => {
 
   try {
     const { stdout: currentBranchRaw } = await runCommand(
-      'git rev-parse --abbrev-ref HEAD',
-      data.pathToRepo,
+      'git',
+      ['rev-parse', '--abbrev-ref', 'HEAD'],
+      repoPath,
     );
     const branch = currentBranchRaw.trim();
     logs.push(`[deploy-repo] Current branch detected: ${branch}`);
 
     const { stdout: statusRaw } = await runCommand(
-      'git status --porcelain',
-      data.pathToRepo,
+      'git',
+      ['status', '--porcelain'],
+      repoPath,
     );
     const hasChanges = statusRaw.trim().length > 0;
     logs.push(
       `[deploy-repo] Pre-deploy status: ${hasChanges ? 'changes detected' : 'no changes, creating empty commit'}.`,
     );
 
-    const gitCommands = {
-      add: 'git add -A',
-      commit: hasChanges
-        ? `git commit -m "${quote(data.commitMessage)}"`
-        : `git commit --allow-empty -m "${quote(data.commitMessage)}"`,
-      push: `git push origin ${branch}`,
-    };
+    const commitArgs = hasChanges
+      ? ['commit', '-m', data.commitMessage]
+      : ['commit', '--allow-empty', '-m', data.commitMessage];
 
     if (hasChanges) {
-      logs.push(`[deploy-repo] Running pre-deploy command: ${gitCommands.add}`);
-      await runCommand(gitCommands.add, data.pathToRepo);
+      logs.push('[deploy-repo] Running pre-deploy command: git add -A');
+      await runCommand('git', ['add', '-A'], repoPath);
     }
 
-    logs.push(`[deploy-repo] Running pre-deploy command: ${gitCommands.commit}`);
-    await runCommand(gitCommands.commit, data.pathToRepo);
+    logs.push('[deploy-repo] Running pre-deploy command: git commit -m <commit-message>');
+    await runCommand('git', commitArgs, repoPath);
     logs.push('[deploy-repo] Commit step completed.');
 
-    logs.push(`[deploy-repo] Running pre-deploy command: ${gitCommands.push}`);
+    logs.push(`[deploy-repo] Running pre-deploy command: git push origin ${branch}`);
     const { stdout: pushStdout, stderr: pushStderr } = await runCommand(
-      gitCommands.push,
-      data.pathToRepo,
+      'git',
+      ['push', 'origin', branch],
+      repoPath,
     );
     logs.push('[deploy-repo] Push step completed.');
     if ((pushStdout || '').trim()) {
@@ -72,15 +66,30 @@ export const deployRepo = async (input: string) => {
       logs.push(`[deploy-repo] git push stderr: ${pushStderr.trim()}`);
     }
 
-    const deployCommand = `gh workflow run ${workflowFileName} --field deployEnv=${data.deployEnv}`;
-    logs.push(`[deploy-repo] Triggering workflow: ${deployCommand}`);
-    const { stdout, stderr } = await runCommand(deployCommand, data.pathToRepo);
+    const deployCommand = [
+      'gh',
+      'workflow',
+      'run',
+      workflowFileName,
+      '--field',
+      `deployEnv=${data.deployEnv}`,
+    ];
+    logs.push(`[deploy-repo] Triggering workflow: ${deployCommand.join(' ')}`);
+    const { stdout, stderr } = await runCommand(
+      'gh',
+      ['workflow', 'run', workflowFileName, '--field', `deployEnv=${data.deployEnv}`],
+      repoPath,
+    );
     logs.push('[deploy-repo] Workflow dispatch command completed.');
 
     return {
       success: true,
-      preDeployCommands: gitCommands,
-      deployCommand,
+      preDeployCommands: {
+        add: 'git add -A',
+        commit: 'git commit -m <commit-message>',
+        push: `git push origin ${branch}`,
+      },
+      deployCommand: deployCommand.join(' '),
       output: stdout?.trim() ?? '',
       errorOutput: stderr?.trim() ?? '',
       logs,
@@ -88,7 +97,7 @@ export const deployRepo = async (input: string) => {
   } catch (error: any) {
     logs.push('[deploy-repo] Failed while running git pre-deploy commands or dispatching workflow.');
     if (error?.cmd) {
-      logs.push(`[deploy-repo] Failed command: ${error.cmd}`);
+      logs.push('[deploy-repo] Failed command: <omitted>');
     }
     if (error?.stdout?.toString().trim()) {
       logs.push(`[deploy-repo] error stdout: ${error.stdout.toString().trim()}`);

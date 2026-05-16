@@ -1,17 +1,19 @@
 import { FunctionTool } from 'openai/resources/responses/responses';
 import { RunNpmCommandInput } from './types';
-import { exec } from 'child_process';
-import { promisify } from 'util';
-
-const execAsync = promisify(exec);
+import { requireConfiguredRepoPath } from '../services/security/tool-access';
+import { requireSafeScriptName, runCommand } from './command-utils';
 
 export const runNpmCommand = async (input: string) => {
   const data = JSON.parse(input) as RunNpmCommandInput;
 
   try {
-    const { stdout, stderr } = await execAsync(`npm run ${data.command}`, {
-      cwd: data.pathToRepo,
-    });
+    const repoPath = await requireConfiguredRepoPath(data.pathToRepo);
+    const scriptName = requireSafeScriptName(data.command);
+    const { stdout, stderr } = await runCommand(
+      'npm',
+      ['run', scriptName],
+      repoPath,
+    );
 
     return {
       successMessage: stdout?.trim() ?? '',

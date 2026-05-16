@@ -3,6 +3,7 @@ import * as fse from 'fs-extra';
 import { FunctionTool } from 'openai/resources/responses/responses';
 import * as path from 'path';
 import puppeteer, { Browser, Page } from 'puppeteer-core';
+import { resolveWorkspacePath } from '../services/security/tool-access';
 import { ChromeHeadlessBrowserInput } from './types';
 
 const DEFAULT_TIMEOUT_MS = 15000;
@@ -323,7 +324,7 @@ const getConsoleSnapshot = (data: ChromeHeadlessBrowserInput) => {
 
 const screenshotSession = async (data: ChromeHeadlessBrowserInput) => {
   const session = requireSession(data);
-  const outputPath = resolveScreenshotPath(data.path);
+  const outputPath = await resolveScreenshotPath(data.path);
   await fse.ensureDir(path.dirname(outputPath));
   await session.page.screenshot({
     path: outputPath,
@@ -590,11 +591,9 @@ const commandPath = (command: string) => {
   }
 };
 
-const resolveScreenshotPath = (targetPath?: string) => {
+const resolveScreenshotPath = async (targetPath?: string) => {
   if (targetPath) {
-    return path.isAbsolute(targetPath)
-      ? targetPath
-      : path.resolve(process.cwd(), targetPath);
+    return await resolveWorkspacePath(targetPath);
   }
   const fileName =
     new Date().toISOString().replaceAll(':', '-').replaceAll('.', '-') +
@@ -607,10 +606,14 @@ const normalizeTargetUrl = (rawUrl: string) => {
   if (!trimmed) {
     throw new Error('url is required');
   }
-  if (/^[a-z][a-z0-9+\-.]*:/i.test(trimmed)) {
-    return trimmed;
+  const target = /^[a-z][a-z0-9+\-.]*:/i.test(trimmed)
+    ? trimmed
+    : `https://${trimmed}`;
+  const parsed = new URL(target);
+  if (!['http:', 'https:'].includes(parsed.protocol)) {
+    throw new Error('Only http and https URLs are allowed.');
   }
-  return `https://${trimmed}`;
+  return parsed.toString();
 };
 
 const createSessionId = () => {
@@ -736,7 +739,7 @@ export const chromeHeadlessBrowserTool: FunctionTool = {
       url: {
         type: 'string',
         description:
-          'URL to open or navigate to. Supports http/https and explicit schemes like data: or file:.',
+          'URL to open or navigate to. Only http and https URLs are allowed.',
       },
       selector: {
         type: 'string',

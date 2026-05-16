@@ -6,23 +6,27 @@ import chalk from 'chalk';
 import { writeBase64Image } from './write-base64-image';
 
 const root = process.cwd();
+const resolvePath = (targetPath: string) =>
+  path.isAbsolute(targetPath) ? targetPath : path.join(root, targetPath);
+
 export const fileService = async () => {
   return {
     writeFile: async (pathWithFileName: string, content: string) => {
-      const dirPath = path.dirname(pathWithFileName);
+      const resolvedPath = resolvePath(pathWithFileName);
+      const dirPath = path.dirname(resolvedPath);
       try {
-        await fse.ensureDir(path.join(root, dirPath));
+        await fse.ensureDir(dirPath);
       } catch (err) {
         console.error(chalk.red('Error creating directory:', err));
       }
-      await fse.writeFile(path.join(root, pathWithFileName), content);
+      await fse.writeFile(resolvedPath, content);
     },
     readFile: async (pathWithFileName: string): Promise<string> => {
-      return fse.readFileSync(pathWithFileName, 'utf-8');
+      return fse.readFileSync(resolvePath(pathWithFileName), 'utf-8');
     },
     readBase64Image: async (pathWithFileName: string): Promise<string> => {
       try {
-        const fileBuffer = await fse.readFile(path.join(root, pathWithFileName));
+        const fileBuffer = await fse.readFile(resolvePath(pathWithFileName));
         return fileBuffer.toString('base64');
       } catch (err) {
         console.error(chalk.red('Error reading image file:'), err);

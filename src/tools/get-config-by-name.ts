@@ -20,7 +20,7 @@ export const getConfigByNameTool: FunctionTool = {
       name: {
         type: 'string',
         description:
-          'The name of the repo to retrieve the configuration for.',
+          'The name of the repo to retrieve the configuration for. Asking for the project name is not a repo.',
       },
     },
     required: ['name'],

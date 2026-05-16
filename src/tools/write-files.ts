@@ -1,10 +1,12 @@
 import { WriteFilesInput } from './types';
 import { FunctionTool } from 'openai/resources/responses/responses';
 import { fileService } from '../services/files';
+import { resolveToolPath } from '../services/security/tool-access';
 
 export const writeFile = async (input: string) => {
   const data = JSON.parse(input) as WriteFilesInput;
-  await (await fileService()).writeFile(data.pathWithFileName, data.content);
+  const safePath = await resolveToolPath(data.pathWithFileName, 'pathWithFileName');
+  await (await fileService()).writeFile(safePath, data.content);
   return { success: true };
 };
 

@@ -1,11 +1,14 @@
 import { FunctionTool } from 'openai/resources/responses/responses';
 import { fileService } from '../services/files';
 import { GetListOfFilesInPathInput } from './types';
+import { resolveToolPath } from '../services/security/tool-access';
 
 export const getListOfFilesInPath = async (input: string) => {
+  const data = JSON.parse(input) as GetListOfFilesInPathInput;
+  const safePath = await resolveToolPath(data.path);
   return await (
     await fileService()
-  ).getListOfFilesInPath((JSON.parse(input) as GetListOfFilesInPathInput).path);
+  ).getListOfFilesInPath(safePath);
 };
 
 export const getListOfFilesInPathTool: FunctionTool = {

@@ -3,6 +3,7 @@ import type OpenAI from 'openai';
 import { Response } from 'openai/resources/responses/responses';
 import { ResponseStream } from 'openai/lib/responses/ResponseStream';
 import { setTimeout as delay } from 'timers/promises';
+import { summarizeToolArgumentsForLog } from './log-sanitizer';
 
 export type StreamedResponse = Response & { __streamed?: true };
 type StreamUiHooks = {
@@ -20,8 +21,6 @@ type CreateStreamParams = Omit<
   Parameters<OpenAI['responses']['create']>[0],
   'stream'
 > & { stream?: true };
-
-const MAX_LOGGED_ARGS_LENGTH = 4000;
 
 export const streamResponseWithRetry = async (
   client: OpenAI,
@@ -69,6 +68,7 @@ export const streamResponseWithRetry = async (
 const logStreamEvents = (stream: ResponseStream, hooks?: StreamUiHooks) => {
   let printedText = false;
   let firstTokenSeen = false;
+  const loggedToolArgumentItems = new Set<string>();
   stream.on('response.output_text.delta', (event) => {
     if (!firstTokenSeen) {
       firstTokenSeen = true;
@@ -86,23 +86,20 @@ const logStreamEvents = (stream: ResponseStream, hooks?: StreamUiHooks) => {
   });
 
   stream.on('response.reasoning_text.delta', (event) => {
+    const summary = summarizeToolArgumentsForLog(event.delta ?? '');
     console.log(
       chalk.magenta(
-        `Reasoning: ${truncateForLog(event.delta ?? '', 800)}`,
+        `Reasoning: ${truncateForLog(summary, 800)}`,
       ),
     );
   });
 
   stream.on('response.function_call_arguments.delta', (event) => {
-    const preview = truncateForLog(
-      event.snapshot ?? event.delta,
-      MAX_LOGGED_ARGS_LENGTH,
-    );
-    console.log(
-      chalk.cyan(
-        `Streaming tool arguments for item ${event.item_id}: ${preview}`,
-      ),
-    );
+    if (loggedToolArgumentItems.has(event.item_id)) {
+      return;
+    }
+    loggedToolArgumentItems.add(event.item_id);
+    console.log(chalk.cyan(`Streaming tool arguments for item ${event.item_id}.`));
   });
 
   stream.on('error', (err) => {

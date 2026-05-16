@@ -1,9 +1,8 @@
 import { FunctionTool } from 'openai/resources/responses/responses';
 import { PublishLibraryAndWaitInput } from './types';
-import { exec } from 'child_process';
-import { promisify } from 'util';
+import { requireConfiguredRepoPath } from '../services/security/tool-access';
+import { requireSafeExecutableName, runCommand } from './command-utils';
 
-const execAsync = promisify(exec);
 const DEFAULT_UPFIX_COMMAND = 'upfix';
 const DEFAULT_POLL_INTERVAL_SECONDS = 15;
 const DEFAULT_TIMEOUT_MINUTES = 20;
@@ -24,15 +23,6 @@ type GhRun = {
 const sleep = async (ms: number) =>
   new Promise((resolve) => setTimeout(resolve, ms));
 
-const runCommand = async (command: string, cwd: string) => {
-  return execAsync(command, {
-    cwd,
-    maxBuffer: 1024 * 1024 * 10,
-  });
-};
-
-const quote = (value: string) => value.replaceAll('"', '\\"');
-
 const runUpfixOrFallback = async (
   repoPath: string,
   message: string,
@@ -41,11 +31,20 @@ const runUpfixOrFallback = async (
   let strategy: 'upfix' | 'git-fallback' = 'upfix';
   let upfixError = '';
   const logs: string[] = [];
+  const safeUpfixCommand = requireSafeExecutableName(
+    upfixCommand,
+    'upfixCommand',
+  );
 
   try {
-    const upfixExecCommand = `${upfixCommand} "${quote(message)}"`;
-    logs.push(`[publish-library-and-wait] Running upfix command: ${upfixExecCommand}`);
-    const { stdout, stderr } = await runCommand(upfixExecCommand, repoPath);
+    logs.push(
+      `[publish-library-and-wait] Running upfix command: ${safeUpfixCommand} <commit-message>`,
+    );
+    const { stdout, stderr } = await runCommand(
+      safeUpfixCommand,
+      [message],
+      repoPath,
+    );
     logs.push('[publish-library-and-wait] upfix command completed successfully.');
     if ((stdout || '').trim()) {
       logs.push(`[publish-library-and-wait] upfix stdout: ${stdout.trim()}`);
@@ -61,9 +60,6 @@ const runUpfixOrFallback = async (
       error?.message ||
       'Unknown upfix error';
     logs.push('[publish-library-and-wait] upfix failed. Falling back to raw git commands.');
-    if (error?.cmd) {
-      logs.push(`[publish-library-and-wait] upfix failed command: ${error.cmd}`);
-    }
     if (error?.stdout?.toString().trim()) {
       logs.push(
         `[publish-library-and-wait] upfix failure stdout: ${error.stdout.toString().trim()}`,
@@ -76,26 +72,35 @@ const runUpfixOrFallback = async (
     }
 
     const { stdout: currentBranchRaw } = await runCommand(
-      'git rev-parse --abbrev-ref HEAD',
+      'git',
+      ['rev-parse', '--abbrev-ref', 'HEAD'],
       repoPath,
     );
     const branch = currentBranchRaw.trim();
     logs.push(`[publish-library-and-wait] Fallback branch detected: ${branch}`);
-    const { stdout: status } = await runCommand('git status --porcelain', repoPath);
+    const { stdout: status } = await runCommand(
+      'git',
+      ['status', '--porcelain'],
+      repoPath,
+    );
     const hasChanges = status.trim().length > 0;
     logs.push(
       `[publish-library-and-wait] Fallback status: ${hasChanges ? 'changes detected' : 'no changes, creating empty commit'}.`,
     );
 
     if (hasChanges) {
-      await runCommand('git add -A', repoPath);
-      await runCommand(`git commit -m "${quote(message)}"`, repoPath);
+      await runCommand('git', ['add', '-A'], repoPath);
+      await runCommand('git', ['commit', '-m', message], repoPath);
       logs.push('[publish-library-and-wait] Fallback commit created from staged changes.');
     } else {
-      await runCommand(`git commit --allow-empty -m "${quote(message)}"`, repoPath);
+      await runCommand(
+        'git',
+        ['commit', '--allow-empty', '-m', message],
+        repoPath,
+      );
       logs.push('[publish-library-and-wait] Fallback empty commit created.');
     }
-    await runCommand(`git push origin ${branch}`, repoPath);
+    await runCommand('git', ['push', 'origin', branch], repoPath);
     logs.push('[publish-library-and-wait] Fallback push completed.');
   }
 
@@ -121,6 +126,7 @@ const getMatchingRuns = (runs: GhRun[], sha: string, packageName?: string) => {
 export const publishLibraryAndWait = async (input: string) => {
   const data = JSON.parse(input) as PublishLibraryAndWaitInput;
   const upfixCommand = data.upfixCommand || DEFAULT_UPFIX_COMMAND;
+  const repoPath = await requireConfiguredRepoPath(data.pathToRepo);
   const pollIntervalSeconds = Math.max(
     2,
     data.pollIntervalSeconds || DEFAULT_POLL_INTERVAL_SECONDS,
@@ -129,12 +135,16 @@ export const publishLibraryAndWait = async (input: string) => {
   const startedAt = Date.now();
 
   const publishInfo = await runUpfixOrFallback(
-    data.pathToRepo,
+    repoPath,
     data.commitMessage,
     upfixCommand,
   );
 
-  const { stdout: commitShaRaw } = await runCommand('git rev-parse HEAD', data.pathToRepo);
+  const { stdout: commitShaRaw } = await runCommand(
+    'git',
+    ['rev-parse', 'HEAD'],
+    repoPath,
+  );
   const commitSha = commitShaRaw.trim();
   const timeoutAt = startedAt + timeoutMinutes * 60 * 1000;
   let attempts = 0;
@@ -144,8 +154,16 @@ export const publishLibraryAndWait = async (input: string) => {
   while (Date.now() < timeoutAt) {
     attempts += 1;
     const { stdout: runsJson } = await runCommand(
-      'gh run list --limit 50 --json conclusion,createdAt,databaseId,displayTitle,headSha,name,status,updatedAt,url,workflowName',
-      data.pathToRepo,
+      'gh',
+      [
+        'run',
+        'list',
+        '--limit',
+        '50',
+        '--json',
+        'conclusion,createdAt,databaseId,displayTitle,headSha,name,status,updatedAt,url,workflowName',
+      ],
+      repoPath,
     );
     const parsed = JSON.parse(runsJson) as GhRun[];
 
@@ -167,8 +185,9 @@ export const publishLibraryAndWait = async (input: string) => {
   }
 
   const { stdout: finalReleaseList } = await runCommand(
-    'gh release list',
-    data.pathToRepo,
+    'gh',
+    ['release', 'list'],
+    repoPath,
   );
 
   if (!matchedRun || matchedRun.status !== 'completed') {

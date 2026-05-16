@@ -1,12 +1,14 @@
 import { FunctionTool } from 'openai/resources/responses/responses';
 import { fileService } from '../services/files';
 import { GetImageByPathInput } from './types';
+import { resolveToolPath } from '../services/security/tool-access';
 
 export const getImageByPath = async (input: string) => {
   const data = JSON.parse(input) as GetImageByPathInput;
   let image = '';
   try {
-    image = await (await fileService()).readBase64Image(data.path);
+    const safePath = await resolveToolPath(data.path);
+    image = await (await fileService()).readBase64Image(safePath);
   } catch (error) {
     console.error('Error reading image:', error);
     image = 'No image found';

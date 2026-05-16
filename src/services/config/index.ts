@@ -1,4 +1,5 @@
 import { fileService } from '../files';
+import * as path from 'path';
 import {
   BaseConfig,
   ContextConfig,
@@ -62,6 +63,9 @@ export const configService = async () => {
     },
     projectRepoConfigsAvailable: () => {
       return repoConfigs.map((p) => p.repoName);
+    },
+    repoRootPathsAvailable: () => {
+      return repoConfigs.map((p) => path.resolve(process.cwd(), p.repo.path));
     },
     getProjectRepoConfig: (name: string) => {
       const project = repoConfigs.find(

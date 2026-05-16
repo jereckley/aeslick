@@ -19,6 +19,10 @@ import * as fse from 'fs-extra';
 import * as path from 'path';
 import { StreamedResponse, streamResponseWithRetry } from '../streaming';
 import { isRestartableResponse } from '../is-restartable-response';
+import {
+  summarizeToolArgumentsForLog,
+  summarizeToolOutputForLog,
+} from '../log-sanitizer';
 
 type ImageInputToolOutput = {
   type: 'image_input';
@@ -47,10 +51,7 @@ export const processResponse =
       );
       for (const item of sorted) {
         if (item.type == 'function_call') {
-          const argsLabel =
-            typeof item.arguments === 'string'
-              ? item.arguments
-              : JSON.stringify(item.arguments);
+          const argsLabel = summarizeToolArgumentsForLog(item.arguments);
           console.log(
             chalk.cyan(
               `Calling tool "${item.name}" with args: ${argsLabel || '<none>'}`,
@@ -62,12 +63,14 @@ export const processResponse =
             ](item.arguments);
             console.log(chalk.cyan(`Tool "${item.name}" completed.`));
             if (isImageInputToolOutput(funcRes)) {
+              const imageInputOutput = safeStringify({
+                attached_image_inputs: funcRes.length,
+              });
+              logToolOutput(item.name, imageInputOutput);
               newList.push({
                 type: 'function_call_output',
                 call_id: item.call_id,
-                output: safeStringify({
-                  attached_image_inputs: funcRes.length,
-                }),
+                output: imageInputOutput,
               });
               newList.push({
                 type: 'message',
@@ -83,6 +86,7 @@ export const processResponse =
               funcRes,
               maxFunctionOutputLength,
             );
+            logToolOutput(item.name, formattedOutput);
             newList.push({
               type: 'function_call_output',
               call_id: item.call_id,
@@ -90,9 +94,10 @@ export const processResponse =
             });
           } catch (error) {
             const errorMessage = formatErrorMessage(error);
+            const loggedError = summarizeToolArgumentsForLog(errorMessage);
             console.error(
               chalk.red(
-                `Tool "${item.name}" failed. Returning error to OpenAI: ${errorMessage}`,
+                `Tool "${item.name}" failed. Returning error to OpenAI: ${loggedError}`,
               ),
             );
             newList.push({
@@ -230,7 +235,9 @@ const logReasoningItem = (item: ResponseReasoningItem) => {
     .trim();
   if (summaryText) {
     console.log(
-      chalk.magenta(`summary: ${truncateForLog(summaryText, 400)}`),
+      chalk.magenta(
+        `summary: ${truncateForLog(summarizeToolArgumentsForLog(summaryText), 400)}`,
+      ),
     );
   }
 
@@ -239,7 +246,7 @@ const logReasoningItem = (item: ResponseReasoningItem) => {
   reasoningSteps.forEach((text, index) => {
     console.log(
       chalk.magenta(
-        `step ${index + 1}: ${truncateForLog(text, 800)}`,
+        `step ${index + 1}: ${truncateForLog(summarizeToolArgumentsForLog(text), 800)}`,
       ),
     );
   });
@@ -282,6 +289,14 @@ const serializeFunctionOutput = (
     note:
       'Output shortened to avoid exceeding the model context window. Ask for a smaller slice or more specific path if needed.',
   });
+};
+
+const logToolOutput = (toolName: string, serializedOutput: string) => {
+  console.log(
+    chalk.yellow(
+      `Tool "${toolName}" response: ${summarizeToolOutputForLog(toolName, serializedOutput)}`,
+    ),
+  );
 };
 
 const safeStringify = (value: unknown): string => {

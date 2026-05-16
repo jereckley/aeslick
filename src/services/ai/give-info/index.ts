@@ -8,6 +8,8 @@ import {
   Tool,
 } from 'openai/resources/responses/responses';
 import { functionMap } from '../../../tools';
+import { DEFAULT_MAX_FUNCTION_OUTPUT_LENGTH } from '../../config';
+import { summarizeToolOutputForLog } from '../log-sanitizer';
 
 type ImageInputToolOutput = {
   type: 'image_input';
@@ -101,12 +103,14 @@ export const giveInfo =
           }
           const output = await fn(toolCall.arguments);
           if (isImageInputToolOutput(output)) {
+            const imageInputOutput = safeStringify({
+              attached_image_inputs: output.length,
+            });
+            logToolOutput(toolCall.name, imageInputOutput);
             toolResults.push({
               type: 'function_call_output',
               call_id: toolCall.call_id,
-              output: JSON.stringify({
-                attached_image_inputs: output.length,
-              }),
+              output: imageInputOutput,
             });
             toolResults.push({
               type: 'message',
@@ -118,10 +122,12 @@ export const giveInfo =
             } as ResponseInputItem);
             continue;
           }
+          const serializedOutput = serializeToolOutput(output);
+          logToolOutput(toolCall.name, serializedOutput);
           toolResults.push({
             type: 'function_call_output',
             call_id: toolCall.call_id,
-            output: JSON.stringify(output),
+            output: serializedOutput,
           });
         } catch (error) {
           const message =
@@ -158,4 +164,44 @@ const isImageInputToolOutput = (
       typeof candidate.image_url === 'string'
     );
   });
+};
+
+const serializeToolOutput = (output: unknown) => {
+  const serialized = safeStringify(output);
+  if (serialized.length <= DEFAULT_MAX_FUNCTION_OUTPUT_LENGTH) {
+    return serialized;
+  }
+
+  const truncated = serialized.slice(0, DEFAULT_MAX_FUNCTION_OUTPUT_LENGTH);
+  return safeStringify({
+    truncated: true,
+    original_length: serialized.length,
+    returned_length: truncated.length,
+    preview: truncated,
+    note:
+      'Output shortened to avoid exceeding the model context window. Ask for a smaller slice or more specific path if needed.',
+  });
+};
+
+const logToolOutput = (toolName: string, serializedOutput: string) => {
+  console.log(
+    chalk.yellow(
+      `Tool "${toolName}" response: ${summarizeToolOutputForLog(toolName, serializedOutput)}`,
+    ),
+  );
+};
+
+const safeStringify = (value: unknown): string => {
+  try {
+    const serialized = JSON.stringify(value);
+    if (typeof serialized === 'string') {
+      return serialized;
+    }
+    return JSON.stringify(String(value));
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    return JSON.stringify({
+      note: `Unable to stringify tool output: ${message}`,
+    });
+  }
 };

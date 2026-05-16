@@ -1,12 +1,14 @@
 import { FunctionTool } from 'openai/resources/responses/responses';
 import { fileService } from '../services/files';
 import { GetFileByPathInput } from './types';
+import { resolveToolPath } from '../services/security/tool-access';
 
 export const getFileByPath = async (input: string) => {
   const data = JSON.parse(input) as GetFileByPathInput;
   let file: string;
   try {
-    file = await (await fileService()).readFile(data.path);
+    const safePath = await resolveToolPath(data.path);
+    file = await (await fileService()).readFile(safePath);
   } catch (error) {
     console.error('Error reading file:', error);
     file = 'No file found';

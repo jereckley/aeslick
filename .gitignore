@@ -7,4 +7,7 @@ coverage
 dist
 
 .envrc
-
+conv.txt
+.aeslick.prompt-history.json
+.aeslick.chat.session.json
+.aeslick.component.session.json
