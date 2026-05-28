@@ -1,5 +1,6 @@
 import { Questions } from 'inquirer';
 import { DEFAULT_MODEL } from '../services/config';
+import { COMMAND_TOOL_CONFIG_CHOICES } from '../services/config/command-settings';
 
 export const CHAT_QUESTIONS: Questions = [
 ];
@@ -71,5 +72,19 @@ export const CREATE_BASE_CONFIG: Questions = [
     name: 'model',
     message: 'Default model to use:',
     default: DEFAULT_MODEL,
+  },
+  {
+    type: 'input',
+    name: 'chatModel',
+    message: 'Model chat should use (leave blank to use the default model):',
+  },
+];
+
+export const CONFIGURE_COMMAND_TOOLS: Questions = [
+  {
+    type: 'list',
+    name: 'commandKey',
+    message: 'Which command should be configured?',
+    choices: COMMAND_TOOL_CONFIG_CHOICES,
   },
 ];

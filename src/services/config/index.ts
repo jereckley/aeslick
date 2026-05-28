@@ -54,9 +54,6 @@ export const configService = async () => {
       }
     }
   }
-  if (repoConfigs.length === 0) {
-    throw new Error('No project configurations found');
-  }
   return {
     baseConfig: () => {
       return baseConfig;

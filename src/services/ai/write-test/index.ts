@@ -2,10 +2,11 @@ import type OpenAI from 'openai';
 import * as fse from 'fs-extra';
 import * as path from 'path';
 import { streamResponseWithRetry } from '../streaming';
+import { configService } from '../../config';
 
 const root = process.cwd();
 export const writeTest =
-  (client: OpenAI) =>
+  (client: OpenAI, modelOverride?: string) =>
   async (
     filePath: string,
     context: string,
@@ -43,8 +44,10 @@ ${filePath}
       'Now write tests for this file using the same instructions an the original prompt: ' +
       filePath;
 
+    const baseConfig = (await configService()).baseConfig();
+    const modelToUse = modelOverride ?? baseConfig.model;
     const res = await streamResponseWithRetry(client, {
-      model: 'o3-pro-2025-06-10',
+      model: modelToUse,
       input: responseId ? followUpPrompt : prompt,
       reasoning: { effort: 'high' },
       previous_response_id: responseId,

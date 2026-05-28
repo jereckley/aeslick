@@ -3,13 +3,16 @@ import * as fse from 'fs-extra';
 import * as path from 'path';
 import { BaseConfig } from '../../services/config/types';
 import { DEFAULT_MODEL } from '../../services/config';
+import { getDefaultCommandToolsConfig } from '../../services/config/command-settings';
 
 export type CreateBaseConfigAnswers = {
   model?: string;
+  chatModel?: string;
 };
 
 export const createBaseConfig = async (answers: CreateBaseConfigAnswers) => {
   const modelToUse = answers.model?.trim() || DEFAULT_MODEL;
+  const chatModelToUse = answers.chatModel?.trim() || modelToUse;
   const writePath = path.join(process.cwd(), 'base.aeslick.json');
 
   if (fse.existsSync(writePath)) {
@@ -20,6 +23,8 @@ export const createBaseConfig = async (answers: CreateBaseConfigAnswers) => {
   }
 
   const content: BaseConfig = {
+    chatModel: chatModelToUse,
+    commandTools: getDefaultCommandToolsConfig(),
     model: modelToUse,
   };
 

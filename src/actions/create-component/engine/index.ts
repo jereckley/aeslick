@@ -1,31 +1,29 @@
-import { Tool, Response } from 'openai/resources/responses/responses';
+import { Tool } from 'openai/resources/responses/responses';
 import { getAiService } from '../../../services/ai';
-import { functionDefinitionsMap } from '../../../tools';
 import { buildContextInput } from '../context-input';
 import { configService } from '../../../services/config';
 import { CreateComponentAnswers } from '..';
 import { promptForInput } from '../../../tools/prompt-for-input';
 import { saveLastComponentResponseId } from '../../../services/component-session';
 import { isRestartableResponse } from '../../../services/ai/is-restartable-response';
+import { AiResponse } from '../../../services/ai/types';
+import {
+  COMPONENT_COMMAND_CONFIG_KEY,
+  getModelForCommand,
+  getToolsForCommand,
+} from '../../../services/config/command-settings';
 
 export const engine = async (answers: CreateComponentAnswers) => {
-  const tools: Tool[] = [
-    functionDefinitionsMap['get-config-by-name'],
-    functionDefinitionsMap['prompt-for-input'],
-    functionDefinitionsMap['write-file'],
-    functionDefinitionsMap['get-list-of-files-in-path'],
-    functionDefinitionsMap['get-file-by-path'],
-    functionDefinitionsMap['get-image-by-path'],
-    functionDefinitionsMap['get-image-inputs-by-file-names'],
-    { type: 'image_generation' },
-    functionDefinitionsMap['run-npm-command'],
-    functionDefinitionsMap['publish-library-and-wait'],
-    functionDefinitionsMap['deploy-repo'],
-    functionDefinitionsMap['inspect-webpage'],
-    functionDefinitionsMap['chrome-headless-browser'],
-  ];
-  const aiService = await getAiService(tools);
   const configSvc = await configService();
+  const baseConfig = configSvc.baseConfig();
+  const tools: Tool[] = getToolsForCommand(
+    baseConfig,
+    COMPONENT_COMMAND_CONFIG_KEY,
+  );
+  const aiService = await getAiService({
+    model: getModelForCommand(baseConfig, COMPONENT_COMMAND_CONFIG_KEY),
+    tools,
+  });
   const repoConfigsAvailable = configSvc.projectRepoConfigsAvailable();
   const projects = configSvc.getNamesOfProjectsAvailable();
   console.log('Project configs available:', projects.join(', '));
@@ -48,7 +46,7 @@ export const engine = async (answers: CreateComponentAnswers) => {
   prompts += `\n\nThe following repo configurations are available: ${repoConfigsAvailable.join(', ')}. You can use the get-config-by-name tool to get the configuration of a specific project.`;
   prompts += `\n\nUser Prompt: "${answers.componentDescription}"`;
 
-  let res: Response | undefined;
+  let res: AiResponse | undefined;
   const previousResponseId = answers.previousResponseId;
 
   if (previousResponseId && !answers.componentDescription) {

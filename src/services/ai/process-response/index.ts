@@ -30,7 +30,7 @@ type ImageInputToolOutput = {
 };
 
 export const processResponse =
-  (client: OpenAI, tools: Tool[]) =>
+  (client: OpenAI, tools: Tool[], modelOverride?: string) =>
   async (res: Response | StreamedResponse) => {
     try {
       const items = res.output || [];
@@ -161,10 +161,11 @@ export const processResponse =
         } satisfies EasyInputMessage);
       }
       console.log(chalk.blue('Requesting next response from OpenAI...'));
+      const modelToUse = modelOverride ?? baseConfig.model;
       const nextResponse = await streamResponseWithRetry(client, {
-        model: baseConfig.model,
+        model: modelToUse,
         reasoning: { effort: 'medium' },
-        tools,
+        ...(tools.length ? { tools } : {}),
         previous_response_id: res.id,
         input: newList,
       });
@@ -188,7 +189,13 @@ export const processResponse =
         chalk.red('Failed to process response from OpenAI:'),
         error,
       );
-      return await forwardErrorToOpenAi(client, tools, res, error);
+      return await forwardErrorToOpenAi(
+        client,
+        tools,
+        modelOverride,
+        res,
+        error,
+      );
     }
   };
 
@@ -360,19 +367,21 @@ const persistConversationId = async (responseId: string) => {
 const forwardErrorToOpenAi = async (
   client: OpenAI,
   tools: Tool[],
+  modelOverride: string | undefined,
   res: Response | StreamedResponse,
   error: unknown,
 ) => {
   const baseConfig = (await configService()).baseConfig();
   const errorMessage = formatErrorMessage(error);
+  const modelToUse = modelOverride ?? baseConfig.model;
   try {
     console.log(
       chalk.yellow('Attempting to forward the error back to OpenAI...'),
     );
     const nextResponse = await streamResponseWithRetry(client, {
-      model: baseConfig.model,
+      model: modelToUse,
       reasoning: { effort: 'medium' },
-      tools,
+      ...(tools.length ? { tools } : {}),
       previous_response_id: res.id,
       input: [
         {

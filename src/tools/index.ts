@@ -1,3 +1,4 @@
+import { Tool } from 'openai/resources/responses/responses';
 import { getConfigByName, getConfigByNameTool } from './get-config-by-name';
 import { getFileByPath, getFileByPathTool } from './get-file-by-path';
 import { getImageByPath, getImageByPathTool } from './get-image-by-path';
@@ -51,4 +52,53 @@ export const functionDefinitionsMap = {
   'deploy-repo': deployRepoTool,
   'inspect-webpage': inspectWebpageTool,
   'chrome-headless-browser': chromeHeadlessBrowserTool,
+};
+
+export const configurableToolDefinitions = {
+  ...functionDefinitionsMap,
+  image_generation: {
+    type: 'image_generation',
+  } satisfies Tool,
+};
+
+export type ConfigurableToolName = keyof typeof configurableToolDefinitions;
+
+const IMAGE_GENERATION_DESCRIPTION = 'Generate images from text prompts.';
+
+export const configurableToolChoices = (
+  Object.entries(configurableToolDefinitions) as Array<
+    [ConfigurableToolName, Tool]
+  >
+).map(([name, tool]) => {
+  const description =
+    tool.type === 'function'
+      ? tool.description
+      : IMAGE_GENERATION_DESCRIPTION;
+
+  return {
+    name: description ? `${name} - ${description}` : name,
+    value: name,
+  };
+});
+
+export const isConfigurableToolName = (
+  name: string,
+): name is ConfigurableToolName => {
+  return name in configurableToolDefinitions;
+};
+
+export const sanitizeConfigurableToolNames = (names: readonly string[]) => {
+  const uniqueNames = new Set<ConfigurableToolName>();
+  for (const name of names) {
+    if (isConfigurableToolName(name)) {
+      uniqueNames.add(name);
+    }
+  }
+  return [...uniqueNames];
+};
+
+export const getConfigurableToolsByName = (names: readonly string[]) => {
+  return sanitizeConfigurableToolNames(names).map(
+    (name) => configurableToolDefinitions[name],
+  );
 };

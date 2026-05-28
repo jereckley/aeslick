@@ -6,22 +6,28 @@ import {
   getLastChatResponseId,
   saveLastChatResponseId,
 } from '../../services/chat-session';
-import { functionDefinitionsMap } from '../../tools';
 import {
   appendPromptHistory,
   getPromptHistory,
 } from '../../services/prompt-history';
 import { isRestartableResponse } from '../../services/ai/is-restartable-response';
+import { configService } from '../../services/config';
+import {
+  CHAT_COMMAND_CONFIG_KEY,
+  getModelForCommand,
+  getToolsForCommand,
+} from '../../services/config/command-settings';
 
 export type ChatAnswers = {
   prompt?: string;
 };
 export const chat = async (arg: ChatAnswers) => {
-  const service = await getAiService([
-    functionDefinitionsMap['write-file'],
-    functionDefinitionsMap['inspect-webpage'],
-    functionDefinitionsMap['chrome-headless-browser'],
-  ]);
+  const configSvc = await configService();
+  const baseConfig = configSvc.baseConfig();
+  const service = await getAiService({
+    model: getModelForCommand(baseConfig, CHAT_COMMAND_CONFIG_KEY),
+    tools: getToolsForCommand(baseConfig, CHAT_COMMAND_CONFIG_KEY),
+  });
   let activeResponseId = await getLastChatResponseId();
 
   if (activeResponseId) {

@@ -9,6 +9,7 @@ import {
 } from 'openai/resources/responses/responses';
 import { functionMap } from '../../../tools';
 import { DEFAULT_MAX_FUNCTION_OUTPUT_LENGTH } from '../../config';
+import { configService } from '../../config';
 import { summarizeToolOutputForLog } from '../log-sanitizer';
 
 type ImageInputToolOutput = {
@@ -17,7 +18,8 @@ type ImageInputToolOutput = {
 };
 
 export const giveInfo =
-  (client: OpenAI, tools?: Tool[]) => async (text: string, responseId?: string) => {
+  (client: OpenAI, tools?: Tool[], modelOverride?: string) =>
+  async (text: string, responseId?: string) => {
     let thinkingTimer: NodeJS.Timeout | undefined;
     let thinkingInterval: NodeJS.Timeout | undefined;
     let thinkingShown = false;
@@ -43,10 +45,12 @@ export const giveInfo =
       input: string | ResponseInputItem[],
       previousResponseId?: string,
     ) => {
+      const baseConfig = (await configService()).baseConfig();
+      const modelToUse = modelOverride ?? baseConfig.model;
       return streamResponseWithRetry(
         client,
         {
-          model: 'gpt-5.4',
+          model: modelToUse,
           reasoning: {
             effort: 'high',
           },

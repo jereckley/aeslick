@@ -42,7 +42,7 @@ export const runNpmCommandTool: FunctionTool = {
       },
       command: {
         type: 'string',
-        description: 'The npm command to run (e.g., "install", "test", "build"). Read repos package.json scripts to see available commands.',
+        description: 'The npm command to run (e.g., "install", "test", "build"). Read repos package.json scripts to see available commands. Do not update package.json, only run existing scripts.',
       },
     },
     required: ['pathToRepo', 'command'],
