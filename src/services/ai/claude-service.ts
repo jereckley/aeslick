@@ -29,11 +29,10 @@ import {
 } from './claude-conversation-store';
 import { createAnthropicCompatibleClient, getResolvedBaseConfig } from './provider';
 import { AiResponse, AiService, AiServiceOptions } from './types';
-
-type ImageInputToolOutput = {
-  type: 'image_input';
-  image_url: string;
-};
+import {
+  getImageInputsForToolOutput,
+  isImageInputToolOutput,
+} from './tool-image-inputs';
 
 let client: OpenAI | undefined;
 
@@ -267,19 +266,28 @@ const processResponse =
               item.name as keyof typeof functionMap
             ](item.arguments);
             console.log(chalk.cyan(`Tool "${item.name}" completed.`));
-            if (isImageInputToolOutput(funcRes)) {
-              const imageInputOutput = safeStringify({
-                attached_image_inputs: funcRes.length,
-              });
-              logToolOutput(item.name, imageInputOutput);
+            const imageInputs = await getImageInputsForToolOutput(
+              item.name,
+              funcRes,
+            );
+            if (imageInputs) {
+              const toolContent = isImageInputToolOutput(funcRes)
+                ? safeStringify({
+                    attached_image_inputs: imageInputs.length,
+                  })
+                : serializeFunctionOutput(
+                    funcRes,
+                    maxFunctionOutputLength,
+                  );
+              logToolOutput(item.name, toolContent);
               newMessages.push({
                 role: 'tool',
                 tool_call_id: item.call_id,
-                content: imageInputOutput,
+                content: toolContent,
               });
               newMessages.push({
                 role: 'user',
-                content: funcRes.map((image) => ({
+                content: imageInputs.map((image) => ({
                   type: 'image_url',
                   image_url: {
                     url: image.image_url,
@@ -532,19 +540,25 @@ const executeToolCalls = async (
         throw new Error(`Tool "${toolCall.name}" is not registered.`);
       }
       const output = await fn(toolCall.arguments);
-      if (isImageInputToolOutput(output)) {
-        const imageInputOutput = safeStringify({
-          attached_image_inputs: output.length,
-        });
-        logToolOutput(toolCall.name, imageInputOutput);
+      const imageInputs = await getImageInputsForToolOutput(
+        toolCall.name,
+        output,
+      );
+      if (imageInputs) {
+        const toolContent = isImageInputToolOutput(output)
+          ? safeStringify({
+              attached_image_inputs: imageInputs.length,
+            })
+          : serializeFunctionOutput(output, maxFunctionOutputLength);
+        logToolOutput(toolCall.name, toolContent);
         toolResults.push({
           role: 'tool',
           tool_call_id: toolCall.call_id,
-          content: imageInputOutput,
+          content: toolContent,
         });
         toolResults.push({
           role: 'user',
-          content: output.map((image) => ({
+          content: imageInputs.map((image) => ({
             type: 'image_url',
             image_url: {
               url: image.image_url,
@@ -623,25 +637,6 @@ const safeStringify = (value: unknown): string => {
       note: `Unable to stringify tool output: ${formatErrorMessage(error)}`,
     });
   }
-};
-
-const isImageInputToolOutput = (
-  output: unknown,
-): output is ImageInputToolOutput[] => {
-  if (!Array.isArray(output)) {
-    return false;
-  }
-
-  return output.every((item) => {
-    if (!item || typeof item !== 'object') {
-      return false;
-    }
-    const candidate = item as Partial<ImageInputToolOutput>;
-    return (
-      candidate.type === 'image_input' &&
-      typeof candidate.image_url === 'string'
-    );
-  });
 };
 
 const formatErrorMessage = (error: unknown) => {

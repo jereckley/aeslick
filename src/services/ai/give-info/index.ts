@@ -11,11 +11,10 @@ import { functionMap } from '../../../tools';
 import { DEFAULT_MAX_FUNCTION_OUTPUT_LENGTH } from '../../config';
 import { configService } from '../../config';
 import { summarizeToolOutputForLog } from '../log-sanitizer';
-
-type ImageInputToolOutput = {
-  type: 'image_input';
-  image_url: string;
-};
+import {
+  getImageInputsForToolOutput,
+  isImageInputToolOutput,
+} from '../tool-image-inputs';
 
 export const giveInfo =
   (client: OpenAI, tools?: Tool[], modelOverride?: string) =>
@@ -106,20 +105,26 @@ export const giveInfo =
             throw new Error(`Tool "${toolCall.name}" is not registered.`);
           }
           const output = await fn(toolCall.arguments);
-          if (isImageInputToolOutput(output)) {
-            const imageInputOutput = safeStringify({
-              attached_image_inputs: output.length,
-            });
-            logToolOutput(toolCall.name, imageInputOutput);
+          const imageInputs = await getImageInputsForToolOutput(
+            toolCall.name,
+            output,
+          );
+          if (imageInputs) {
+            const serializedOutput = isImageInputToolOutput(output)
+              ? safeStringify({
+                  attached_image_inputs: imageInputs.length,
+                })
+              : serializeToolOutput(output);
+            logToolOutput(toolCall.name, serializedOutput);
             toolResults.push({
               type: 'function_call_output',
               call_id: toolCall.call_id,
-              output: imageInputOutput,
+              output: serializedOutput,
             });
             toolResults.push({
               type: 'message',
               role: 'user',
-              content: output.map((image) => ({
+              content: imageInputs.map((image) => ({
                 type: 'input_image',
                 image_url: image.image_url,
               })) as any,
@@ -151,24 +156,6 @@ export const giveInfo =
     }
     return res;
   };
-
-const isImageInputToolOutput = (
-  output: unknown,
-): output is ImageInputToolOutput[] => {
-  if (!Array.isArray(output)) {
-    return false;
-  }
-  return output.every((item) => {
-    if (!item || typeof item !== 'object') {
-      return false;
-    }
-    const candidate = item as Partial<ImageInputToolOutput>;
-    return (
-      candidate.type === 'image_input' &&
-      typeof candidate.image_url === 'string'
-    );
-  });
-};
 
 const serializeToolOutput = (output: unknown) => {
   const serialized = safeStringify(output);

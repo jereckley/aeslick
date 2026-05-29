@@ -23,11 +23,10 @@ import {
   summarizeToolArgumentsForLog,
   summarizeToolOutputForLog,
 } from '../log-sanitizer';
-
-type ImageInputToolOutput = {
-  type: 'image_input';
-  image_url: string;
-};
+import {
+  getImageInputsForToolOutput,
+  isImageInputToolOutput,
+} from '../tool-image-inputs';
 
 export const processResponse =
   (client: OpenAI, tools: Tool[], modelOverride?: string) =>
@@ -62,20 +61,29 @@ export const processResponse =
               item.name as keyof typeof functionMap
             ](item.arguments);
             console.log(chalk.cyan(`Tool "${item.name}" completed.`));
-            if (isImageInputToolOutput(funcRes)) {
-              const imageInputOutput = safeStringify({
-                attached_image_inputs: funcRes.length,
-              });
-              logToolOutput(item.name, imageInputOutput);
+            const imageInputs = await getImageInputsForToolOutput(
+              item.name,
+              funcRes,
+            );
+            if (imageInputs) {
+              const functionOutput = isImageInputToolOutput(funcRes)
+                ? safeStringify({
+                    attached_image_inputs: imageInputs.length,
+                  })
+                : serializeFunctionOutput(
+                    funcRes,
+                    maxFunctionOutputLength,
+                  );
+              logToolOutput(item.name, functionOutput);
               newList.push({
                 type: 'function_call_output',
                 call_id: item.call_id,
-                output: imageInputOutput,
+                output: functionOutput,
               });
               newList.push({
                 type: 'message',
                 role: 'user',
-                content: funcRes.map((image) => ({
+                content: imageInputs.map((image) => ({
                   type: 'input_image',
                   image_url: image.image_url,
                 })) as any,
@@ -318,25 +326,6 @@ const safeStringify = (value: unknown): string => {
     note: `Unable to stringify tool output: ${formatErrorMessage(error)}`,
   });
   }
-};
-
-const isImageInputToolOutput = (
-  output: unknown,
-): output is ImageInputToolOutput[] => {
-  if (!Array.isArray(output)) {
-    return false;
-  }
-
-  return output.every((item) => {
-    if (!item || typeof item !== 'object') {
-      return false;
-    }
-    const candidate = item as Partial<ImageInputToolOutput>;
-    return (
-      candidate.type === 'image_input' &&
-      typeof candidate.image_url === 'string'
-    );
-  });
 };
 
 const formatErrorMessage = (error: unknown) => {
